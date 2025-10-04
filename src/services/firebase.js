@@ -61,7 +61,7 @@ if (isFirebaseConfigured) {
 
 // Auth functions
 export const signUpWithEmail = async (email, password, displayName) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !auth || !db) {
     throw new Error('Firebase is not configured. Please set up Firebase credentials in .env file.');
   }
   
@@ -88,7 +88,7 @@ export const signUpWithEmail = async (email, password, displayName) => {
 };
 
 export const signInWithEmail = async (email, password) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !auth) {
     throw new Error('Firebase is not configured. Please set up Firebase credentials in .env file.');
   }
   
@@ -101,7 +101,7 @@ export const signInWithEmail = async (email, password) => {
 };
 
 export const signInWithGoogle = async () => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !auth || !googleProvider) {
     throw new Error('Firebase is not configured. Please set up Firebase credentials in .env file.');
   }
   
@@ -132,7 +132,7 @@ export const signInWithGoogle = async () => {
 };
 
 export const logout = async () => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !auth) {
     throw new Error('Firebase is not configured.');
   }
   
@@ -145,7 +145,7 @@ export const logout = async () => {
 
 // User data functions
 export const getUserData = async (uid) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !db) {
     console.warn('Firebase not configured, returning null user data');
     return null;
   }
@@ -162,7 +162,7 @@ export const getUserData = async (uid) => {
 };
 
 export const updateUserData = async (uid, data) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !db) {
     throw new Error('Firebase is not configured. Cannot update user data.');
   }
   
@@ -175,7 +175,7 @@ export const updateUserData = async (uid, data) => {
 };
 
 export const saveRepo = async (uid, repoId) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !db) {
     throw new Error('Firebase is not configured. Cannot save repositories.');
   }
   
@@ -189,7 +189,7 @@ export const saveRepo = async (uid, repoId) => {
 };
 
 export const unsaveRepo = async (uid, repoId) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !db) {
     throw new Error('Firebase is not configured. Cannot unsave repositories.');
   }
   

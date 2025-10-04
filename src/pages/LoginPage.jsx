@@ -78,14 +78,17 @@ const LoginPage = () => {
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                {!formData.email && (
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 transition-opacity duration-200 pointer-events-none z-10" size={20} />
+                )}
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  className="input-field pl-10"
+                  autoComplete="email"
+                  className={`input-field transition-all duration-200 relative z-20 bg-transparent ${formData.email ? 'pl-4' : 'pl-10'}`}
                   placeholder="you@example.com"
                 />
               </div>
@@ -96,14 +99,17 @@ const LoginPage = () => {
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                {!formData.password && (
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 transition-opacity duration-200 pointer-events-none z-10" size={20} />
+                )}
                 <input
                   type="password"
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  className="input-field pl-10"
+                  autoComplete="current-password"
+                  className={`input-field transition-all duration-200 relative z-20 bg-transparent ${formData.password ? 'pl-4' : 'pl-10'}`}
                   placeholder="••••••••"
                 />
               </div>

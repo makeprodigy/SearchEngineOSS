@@ -97,14 +97,17 @@ const SignupPage = () => {
                 Full Name
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                {!formData.displayName && (
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 transition-opacity duration-200 pointer-events-none z-10" size={20} />
+                )}
                 <input
                   type="text"
                   name="displayName"
                   value={formData.displayName}
                   onChange={handleChange}
                   required
-                  className="input-field pl-10"
+                  autoComplete="name"
+                  className={`input-field transition-all duration-200 relative z-20 bg-transparent ${formData.displayName ? 'pl-4' : 'pl-10'}`}
                   placeholder="John Doe"
                 />
               </div>
@@ -115,14 +118,17 @@ const SignupPage = () => {
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                {!formData.email && (
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 transition-opacity duration-200 pointer-events-none z-10" size={20} />
+                )}
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  className="input-field pl-10"
+                  autoComplete="email"
+                  className={`input-field transition-all duration-200 relative z-20 bg-transparent ${formData.email ? 'pl-4' : 'pl-10'}`}
                   placeholder="you@example.com"
                 />
               </div>
@@ -133,7 +139,9 @@ const SignupPage = () => {
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                {!formData.password && (
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 transition-opacity duration-200 pointer-events-none z-10" size={20} />
+                )}
                 <input
                   type="password"
                   name="password"
@@ -141,7 +149,8 @@ const SignupPage = () => {
                   onChange={handleChange}
                   required
                   minLength={6}
-                  className="input-field pl-10"
+                  autoComplete="new-password"
+                  className={`input-field transition-all duration-200 relative z-20 bg-transparent ${formData.password ? 'pl-4' : 'pl-10'}`}
                   placeholder="••••••••"
                 />
               </div>
@@ -152,7 +161,9 @@ const SignupPage = () => {
                 Confirm Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                {!formData.confirmPassword && (
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 transition-opacity duration-200 pointer-events-none z-10" size={20} />
+                )}
                 <input
                   type="password"
                   name="confirmPassword"
@@ -160,7 +171,8 @@ const SignupPage = () => {
                   onChange={handleChange}
                   required
                   minLength={6}
-                  className="input-field pl-10"
+                  autoComplete="new-password"
+                  className={`input-field transition-all duration-200 relative z-20 bg-transparent ${formData.confirmPassword ? 'pl-4' : 'pl-10'}`}
                   placeholder="••••••••"
                 />
               </div>
