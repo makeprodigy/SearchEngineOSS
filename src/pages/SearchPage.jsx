@@ -24,6 +24,7 @@ const SearchPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [resultsPerPage, setResultsPerPage] = useState(30);
+  const [initialLoad, setInitialLoad] = useState(true);
 
   // Debounce search query and filters for real-time filtering
   const debouncedQuery = useDebounce(query, 800); // Increased debounce time
@@ -33,16 +34,33 @@ const SearchPage = () => {
   const [languages, setLanguages] = useState(['JavaScript', 'Python', 'TypeScript', 'Go', 'Rust', 'Java', 'C++', 'Ruby', 'PHP', 'Swift']);
   const [licenses, setLicenses] = useState(['MIT', 'Apache-2.0', 'GPL-3.0', 'BSD-3-Clause', 'ISC', 'LGPL-3.0']);
 
+  // Initial load: Fetch top repositories by health score
+  useEffect(() => {
+    if (initialLoad && !query && Object.keys(filters).length === 0) {
+      // Load top repositories sorted by stars (which contributes to health score)
+      const initialFilters = {
+        sortBy: 'stars',
+        minStars: 1000 // Get repos with at least 1000 stars
+      };
+      performSearch('', initialFilters, 1, false);
+      setInitialLoad(false);
+    }
+  }, []);
+
   // Sync query with URL params
   useEffect(() => {
     const q = searchParams.get('q') || '';
     if (q !== query) {
       setQuery(q);
+      setInitialLoad(false);
     }
   }, [searchParams]);
 
   // Perform search when debounced values change (but only if there's a query or filters)
   useEffect(() => {
+    // Skip if this is initial load (handled by separate effect)
+    if (initialLoad) return;
+    
     // Reset to page 1 when query or filters change
     setCurrentPage(1);
     
@@ -50,21 +68,23 @@ const SearchPage = () => {
     if (debouncedQuery.trim() || Object.keys(debouncedFilters).length > 0) {
       performSearch(debouncedQuery, debouncedFilters, 1, false);
     } else if (hasSearched) {
-      // Clear results if query is cleared after a search
-      setResults([]);
-      setError(null);
-      setHasMore(false);
+      // If query and filters are cleared, reload top repositories
+      const initialFilters = {
+        sortBy: 'stars',
+        minStars: 1000
+      };
+      performSearch('', initialFilters, 1, false);
     }
   }, [debouncedQuery, debouncedFilters, useGitHubAPI, resultsPerPage]);
 
   const performSearch = async (searchQuery, searchFilters, page = 1, append = false) => {
-    // Don't search if query is empty and no filters
-    if (!searchQuery.trim() && Object.keys(searchFilters).length === 0) {
-      setResults([]);
-      setLoading(false);
-      setLoadingMore(false);
-      return;
-    }
+    // Allow search with empty query if filters are present (for initial load and filtered searches)
+    // if (!searchQuery.trim() && Object.keys(searchFilters).length === 0) {
+    //   setResults([]);
+    //   setLoading(false);
+    //   setLoadingMore(false);
+    //   return;
+    // }
 
     if (append) {
       setLoadingMore(true);
@@ -85,12 +105,18 @@ const SearchPage = () => {
           resultsPerPage
         );
         
+        // Sort by health score for initial load and when no specific query
+        let sortedResults = searchResults;
+        if (!searchQuery.trim() && !searchFilters.sortBy) {
+          sortedResults = [...searchResults].sort((a, b) => b.healthScore - a.healthScore);
+        }
+        
         if (append) {
           // Append to existing results
-          setResults(prev => [...prev, ...searchResults]);
+          setResults(prev => [...prev, ...sortedResults]);
         } else {
           // Replace results
-          setResults(searchResults);
+          setResults(sortedResults);
         }
         
         setHasMore(moreAvailable);
@@ -210,7 +236,7 @@ const SearchPage = () => {
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2 gap-4">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {query ? `Search results for "${query}"` : 'Discover Repositories'}
+                  {query ? `Search results for "${query}"` : 'Top Repositories'}
                 </h1>
                 
                 <div className="flex items-center gap-3">
@@ -244,7 +270,7 @@ const SearchPage = () => {
               <p className="text-gray-600 dark:text-gray-400">
                 {loading ? 'Searching...' : 
                   hasSearched ? `Found ${results.length} ${results.length === 1 ? 'repository' : 'repositories'}` :
-                  'Enter a search query or apply filters to discover repositories'}
+                  'Loading top repositories sorted by health score...'}
               </p>
             </div>
 
@@ -302,23 +328,23 @@ const SearchPage = () => {
               </div>
             )}
 
-            {/* Empty State */}
-            {!loading && !error && !hasSearched && (
+            {/* Empty State - Only show when there's an error or no results after search */}
+            {!loading && !error && hasSearched && results.length === 0 && (
               <div className="flex items-center justify-center py-20">
                 <div className="text-center max-w-md">
                   <div className="text-6xl mb-4">🔍</div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                    Start Your Search
+                    No repositories found
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Search for open-source repositories or use filters to discover projects that match your interests
+                    Try adjusting your search query or filters to discover more projects
                   </p>
                 </div>
               </div>
             )}
 
             {/* Results Grid */}
-            {!loading && !error && hasSearched && (
+            {!loading && !error && hasSearched && results.length > 0 && (
               <>
                 <RepoGrid 
                   repos={results}
