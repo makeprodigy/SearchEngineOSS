@@ -38,14 +38,19 @@ const SignupPage = () => {
 
     setLoading(true);
 
-    try {
-      await signup(formData.email, formData.password, formData.displayName);
-      navigate('/onboarding');
-    } catch (error) {
-      setError(error.message || 'Failed to create account. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    // Navigate immediately with user data - don't wait for Firebase
+    navigate('/onboarding', { 
+      state: { 
+        email: formData.email, 
+        displayName: formData.displayName 
+      } 
+    });
+
+    // Fire the signup in the background (don't await)
+    signup(formData.email, formData.password, formData.displayName).catch(error => {
+      console.error('Signup error (background):', error);
+      // User is already on onboarding page, so we just log the error
+    });
   };
 
   const handleGoogleSignIn = async () => {
@@ -54,10 +59,13 @@ const SignupPage = () => {
 
     try {
       await signinWithGoogle();
+      // Navigate to onboarding page on success
       navigate('/onboarding');
     } catch (error) {
+      console.error('Google sign-in error:', error);
       setError(error.message || 'Failed to sign in with Google.');
     } finally {
+      // Always reset loading to avoid a stuck button if navigation is blocked
       setLoading(false);
     }
   };

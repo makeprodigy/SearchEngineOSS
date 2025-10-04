@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clear Cache - OSS Discovery</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 20px;
+        background: #1a1a1a;
+        color: #fff;
+      }
+      .container {
+        background: #2a2a2a;
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      }
+      h1 {
+        color: #60a5fa;
+        margin-top: 0;
+      }
+      button {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 10px 10px 10px 0;
+      }
+      button:hover {
+        background: #2563eb;
+      }
+      .success {
+        background: #10b981;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 20px 0;
+        display: none;
+      }
+      .info {
+        background: #1e3a8a;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 20px 0;
+      }
+      code {
+        background: #1a1a1a;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: "Courier New", monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🧹 Clear Cache</h1>
+
+      <div class="info">
+        <strong>Having rate limit issues?</strong><br />
+        This tool will clear all cached GitHub API data from your browser's
+        localStorage.
+      </div>
+
+      <button onclick="clearCache()">Clear All Cache</button>
+      <button onclick="window.close()">Close</button>
+
+      <div id="success" class="success">
+        ✅ Cache cleared successfully! You can now close this page and refresh
+        your app.
+      </div>
+
+      <div style="margin-top: 30px; color: #9ca3af; font-size: 14px">
+        <p><strong>What this clears:</strong></p>
+        <ul>
+          <li>Cached repository search results</li>
+          <li>Cached rate limit information</li>
+          <li>Cached contributor counts</li>
+          <li>All GitHub API cached data</li>
+        </ul>
+
+        <p style="margin-top: 20px">
+          <strong>Alternative:</strong> Open your browser DevTools (F12), go to
+          Application → Storage → Clear Site Data
+        </p>
+      </div>
+    </div>
+
+    <script>
+      function clearCache() {
+        try {
+          // Count items to clear
+          let clearedCount = 0;
+          const keys = Object.keys(localStorage);
+
+          keys.forEach((key) => {
+            if (key.startsWith("gh_cache_")) {
+              localStorage.removeItem(key);
+              clearedCount++;
+            }
+          });
+
+          // Show success message
+          const successDiv = document.getElementById("success");
+          successDiv.style.display = "block";
+          successDiv.innerHTML = `✅ Cleared ${clearedCount} cached items! Refresh your app to see the changes.`;
+
+          console.log(`Cleared ${clearedCount} cache items`);
+        } catch (error) {
+          alert("Error clearing cache: " + error.message);
+        }
+      }
+    </script>
+  </body>
+</html>

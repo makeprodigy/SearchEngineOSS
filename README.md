@@ -156,8 +156,7 @@ src/
 │   ├── ProtectedRoute.jsx
 │   ├── RepoCard.jsx
 │   ├── RepoGrid.jsx
-│   ├── SearchBar.jsx
-│   └── ThemeToggle.jsx
+│   └── SearchBar.jsx
 ├── contexts/           # React contexts
 │   ├── AuthContext.jsx
 │   └── ThemeContext.jsx

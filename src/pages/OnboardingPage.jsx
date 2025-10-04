@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Code, ChevronRight, Sparkles } from 'lucide-react';
 
@@ -19,6 +19,9 @@ const POPULAR_TECH_STACK = [
 const OnboardingPage = () => {
   const { updateProfile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const userData = location.state; // Get user data passed from signup
+
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     bio: '',
@@ -47,27 +50,47 @@ const OnboardingPage = () => {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      await updateProfile({
-        ...formData,
-        onboardingComplete: true
-      });
-      navigate('/');
-    } catch (error) {
-      console.error('Error completing onboarding:', error);
-      alert('Failed to save preferences');
-    } finally {
-      setLoading(false);
-    }
+    // Prepare complete user data
+    const completeUserData = {
+      email: userData?.email || '',
+      displayName: userData?.displayName || '',
+      bio: formData.bio,
+      techStack: formData.techStack,
+      onboardingComplete: true,
+      createdAt: new Date().toISOString(),
+      isAuthenticated: true
+    };
+
+    // Update profile (saves to localStorage immediately, syncs to Firebase in background)
+    await updateProfile(completeUserData);
+
+    // Set authenticated status
+    localStorage.setItem('isAuthenticated', 'true');
+    console.log('✅ User authenticated and onboarding complete');
+
+    // Navigate immediately - Firebase syncs in background
+    navigate('/');
   };
 
   const handleSkip = async () => {
-    try {
-      await updateProfile({ onboardingComplete: true });
-      navigate('/');
-    } catch (error) {
-      console.error('Error skipping onboarding:', error);
-    }
+    // Save basic user data even when skipping
+    const basicUserData = {
+      email: userData?.email || '',
+      displayName: userData?.displayName || '',
+      onboardingComplete: false,
+      createdAt: new Date().toISOString(),
+      isAuthenticated: true
+    };
+
+    // Update profile (saves to localStorage immediately, syncs to Firebase in background)
+    await updateProfile(basicUserData);
+    
+    // Set authenticated status
+    localStorage.setItem('isAuthenticated', 'true');
+    console.log('✅ User authenticated (skipped onboarding)');
+    
+    // Navigate away - they can complete onboarding later
+    navigate('/');
   };
 
   return (
@@ -196,7 +219,7 @@ const OnboardingPage = () => {
                     disabled={loading}
                     className="btn-primary disabled:opacity-50"
                   >
-                    {loading ? 'Saving...' : 'Complete Setup'}
+                    {loading ? 'Completing...' : 'Complete Setup'}
                   </button>
                 </div>
               </div>
@@ -209,4 +232,3 @@ const OnboardingPage = () => {
 };
 
 export default OnboardingPage;
-

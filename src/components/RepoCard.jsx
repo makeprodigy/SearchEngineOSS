@@ -10,9 +10,18 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
   const [saved, setSaved] = useState(isSaved);
   const [saving, setSaving] = useState(false);
 
+  // Check if user is authenticated via Firebase OR localStorage
+  const isAuthenticated = currentUser || userData || localStorage.getItem('isAuthenticated') === 'true';
+
   const handleToggleSave = async () => {
-    if (!currentUser) {
+    if (!isAuthenticated) {
       alert('Please sign in to save repositories');
+      return;
+    }
+
+    // If we don't have Firebase currentUser yet, store locally and sync later
+    if (!currentUser) {
+      alert('Your account is being set up. Please try again in a moment.');
       return;
     }
 
@@ -28,7 +37,7 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
       if (onToggleSave) onToggleSave(repo.id, !saved);
     } catch (error) {
       console.error('Error toggling save:', error);
-      alert('Failed to save repository');
+      alert('Failed to save repository. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -159,6 +168,7 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
               stroke="#0ea5e9" 
               strokeWidth={2} 
               dot={false}
+              activeDot={false}
             />
           </LineChart>
         </ResponsiveContainer>

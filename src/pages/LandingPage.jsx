@@ -14,10 +14,22 @@ const LandingPage = () => {
   const [trendingRepos, setTrendingRepos] = useState([]);
   const [recommendedRepos, setRecommendedRepos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadedTechStack, setLoadedTechStack] = useState(null);
 
   useEffect(() => {
     loadRepositories();
-  }, [userData?.techStack]);
+  }, []); // Only load once on mount
+
+  useEffect(() => {
+    // Load recommendations separately when tech stack changes
+    const techStackString = userData?.techStack?.join(',') || '';
+    
+    // Only fetch if tech stack has actually changed
+    if (techStackString && techStackString !== loadedTechStack) {
+      loadRecommendations(userData.techStack);
+      setLoadedTechStack(techStackString);
+    }
+  }, [userData?.techStack, loadedTechStack]);
 
   const loadRepositories = async () => {
     setLoading(true);
@@ -31,18 +43,28 @@ const LandingPage = () => {
       setPopularRepos(popular);
       setTrendingRepos(trending);
 
-      // Fetch recommendations based on user's tech stack
+      // Load initial recommendations if user has tech stack
       if (userData?.techStack?.length > 0) {
-        const query = userData.techStack.join(' OR ');
-        const recommended = await searchWithFilters(query, { minStars: 1000 });
-        setRecommendedRepos(recommended.slice(0, 6));
+        const techStackString = userData.techStack.join(',');
+        setLoadedTechStack(techStackString);
+        await loadRecommendations(userData.techStack);
       }
     } catch (error) {
       console.error('Error loading repositories:', error);
-      // If GitHub API fails, we could fallback to mock data
-      // For now, we'll just show empty sections
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRecommendations = async (techStack) => {
+    if (!techStack || techStack.length === 0) return;
+    
+    try {
+      const query = techStack.join(' OR ');
+      const recommended = await searchWithFilters(query, { minStars: 1000 });
+      setRecommendedRepos(recommended.slice(0, 6));
+    } catch (error) {
+      console.error('Error loading recommendations:', error);
     }
   };
 
