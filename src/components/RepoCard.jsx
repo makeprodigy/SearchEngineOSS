@@ -9,6 +9,7 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
   const { currentUser, userData, refreshUserData } = useAuth();
   const [saved, setSaved] = useState(isSaved);
   const [saving, setSaving] = useState(false);
+  const [showAllTopics, setShowAllTopics] = useState(false); // Add this state
 
   const handleToggleSave = async () => {
     if (!currentUser) {
@@ -152,13 +153,18 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
           </span>
         </div>
         <ResponsiveContainer width="100%" height={40}>
-          <LineChart data={sparklineData}>
+          <LineChart data={sparklineData}
+          
+            onMouseUp={() => {}}>
+          
             <Line 
               type="monotone" 
               dataKey="value" 
               stroke="#0ea5e9" 
               strokeWidth={2} 
               dot={false}
+              activeDot={false}
+             
             />
           </LineChart>
         </ResponsiveContainer>
@@ -170,7 +176,7 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
           <Code size={14} className="text-gray-600 dark:text-gray-400" />
           <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{repo.language}</span>
         </div>
-        {repo.topics.slice(0, 3).map((topic, index) => (
+        {(showAllTopics ? repo.topics : repo.topics.slice(0, 3)).map((topic, index) => (
           <span
             key={index}
             className="bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-md text-xs font-medium"
@@ -178,10 +184,21 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
             {topic}
           </span>
         ))}
-        {repo.topics.length > 3 && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 py-1">
+        {repo.topics.length > 3 && !showAllTopics && (
+          <button 
+            onClick={() => setShowAllTopics(true)}
+            className="text-xs text-primary-600 dark:text-primary-400 py-1 hover:underline cursor-pointer"
+          >
             +{repo.topics.length - 3} more
-          </span>
+          </button>
+        )}
+        {showAllTopics && repo.topics.length > 3 && (
+          <button 
+            onClick={() => setShowAllTopics(false)}
+            className="text-xs text-primary-600 dark:text-primary-400 py-1 hover:underline cursor-pointer"
+          >
+            Show less
+          </button>
         )}
       </div>
 
