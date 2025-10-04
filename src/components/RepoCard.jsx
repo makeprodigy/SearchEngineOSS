@@ -13,6 +13,14 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
   // Check if user is authenticated via Firebase OR localStorage
   const isAuthenticated = currentUser || userData || localStorage.getItem('isAuthenticated') === 'true';
 
+  const splitStringWithLineBreaks = (str, chunkSize = 15) => {
+    const parts = [];
+    for (let i = 0; i < str.length; i += chunkSize) {
+      parts.push(str.substring(i, i + chunkSize));
+    }
+    return parts;
+  };
+  
   const handleToggleSave = async () => {
     if (!isAuthenticated) {
       alert('Please sign in to save repositories');
@@ -72,34 +80,41 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
   }));
 
   return (
-    <div className="card p-6 h-full flex flex-col">
+    <div className="card p-6 h-full flex flex-col relative">
       {/* Header */}
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
-              <a href={repo.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
-                {repo.fullName}
-                <ExternalLink size={16} />
-              </a>
-            </h3>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-            {repo.description}
-          </p>
-        </div>
-        <button
-          onClick={handleToggleSave}
-          disabled={saving}
-          className="ml-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          title={saved ? 'Remove from saved' : 'Save repository'}
-        >
-          {saved ? (
-            <Bookmark className="text-primary-600 dark:text-primary-400" size={20} fill="currentColor" />
-          ) : (
-            <BookmarkPlus className="text-gray-600 dark:text-gray-400" size={20} />
-          )}
-        </button>
+      <button
+        onClick={handleToggleSave}
+        disabled={saving}
+        className="absolute top-4 right-4 p-2 hover:bg-teal-900/30 rounded-lg transition-colors z-10"
+        title={saved ? 'Remove from saved' : 'Save repository'}
+      >
+        {saved ? (
+          <Bookmark className="text-teal-200" size={20} fill="currentColor" />
+        ) : (
+          <BookmarkPlus className="text-gray-400" size={20} />
+        )}
+      </button>
+
+      {/* Header (title & description) */}
+      <div className="mb-3">
+        <h3 className="text-xl font-bold hover:text-teal-200 transition-colors leading-snug">
+          <a
+            href={repo.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block whitespace-pre-line"
+          >
+            {splitStringWithLineBreaks(repo.fullName).map((part, idx) => (
+              <span key={idx}>
+                {part}
+                {idx !== splitStringWithLineBreaks(repo.fullName).length - 1 && <br />}
+              </span>
+            ))}
+          </a>
+        </h3>
+        <p className="text-sm text-gray-400 line-clamp-2 mt-1">
+          {repo.description}
+        </p>
       </div>
 
       {/* Health Score Badge */}
