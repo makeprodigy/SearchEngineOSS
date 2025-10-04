@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub API Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .test-box {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      button {
+        background: #0066cc;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background: #0052a3;
+      }
+      .result {
+        margin-top: 15px;
+        padding: 15px;
+        background: #f0f0f0;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🧪 GitHub API Test</h1>
+
+    <div class="test-box">
+      <h2>Test 1: Basic API Connection</h2>
+      <p>This tests if we can reach GitHub API without authentication</p>
+      <button onclick="testBasicAPI()">Run Test</button>
+      <div id="basic-result" class="result" style="display: none"></div>
+    </div>
+
+    <div class="test-box">
+      <h2>Test 2: Search Repositories</h2>
+      <p>This tests the search endpoint (most commonly used)</p>
+      <button onclick="testSearch()">Run Test</button>
+      <div id="search-result" class="result" style="display: none"></div>
+    </div>
+
+    <div class="test-box">
+      <h2>Test 3: Rate Limit Status</h2>
+      <p>Check your current rate limit status</p>
+      <button onclick="testRateLimit()">Check Rate Limit</button>
+      <div id="rate-result" class="result" style="display: none"></div>
+    </div>
+
+    <script>
+      async function testBasicAPI() {
+        const resultDiv = document.getElementById("basic-result");
+        resultDiv.style.display = "block";
+        resultDiv.textContent = "Testing...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("https://api.github.com/");
+          const data = await response.json();
+
+          resultDiv.className = "result success";
+          resultDiv.textContent =
+            "✅ SUCCESS!\n\n" +
+            "GitHub API is reachable.\n" +
+            "Status: " +
+            response.status +
+            "\n" +
+            "Response: " +
+            JSON.stringify(data, null, 2);
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ ERROR!\n\n" + error.message;
+        }
+      }
+
+      async function testSearch() {
+        const resultDiv = document.getElementById("search-result");
+        resultDiv.style.display = "block";
+        resultDiv.textContent = "Testing search...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch(
+            "https://api.github.com/search/repositories?q=react&per_page=3"
+          );
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.className = "result success";
+            resultDiv.textContent =
+              "✅ SUCCESS!\n\n" +
+              "Found " +
+              data.total_count +
+              " repositories.\n" +
+              "First 3 results:\n\n" +
+              data.items
+                .map(
+                  (repo) =>
+                    `- ${repo.full_name} (${repo.stargazers_count} stars)`
+                )
+                .join("\n");
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent =
+              "❌ ERROR!\n\n" +
+              "Status: " +
+              response.status +
+              "\n" +
+              "Message: " +
+              (data.message || "Unknown error");
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ ERROR!\n\n" + error.message;
+        }
+      }
+
+      async function testRateLimit() {
+        const resultDiv = document.getElementById("rate-result");
+        resultDiv.style.display = "block";
+        resultDiv.textContent = "Checking rate limit...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("https://api.github.com/rate_limit");
+          const data = await response.json();
+
+          const remaining = data.resources.core.remaining;
+          const limit = data.resources.core.limit;
+          const resetTime = new Date(data.resources.core.reset * 1000);
+
+          resultDiv.className =
+            "result " + (remaining > 10 ? "success" : "error");
+          resultDiv.textContent =
+            "📊 Rate Limit Status:\n\n" +
+            "Remaining: " +
+            remaining +
+            " / " +
+            limit +
+            "\n" +
+            "Resets at: " +
+            resetTime.toLocaleString() +
+            "\n\n" +
+            (limit === 60
+              ? "⚠️ You are NOT using a GitHub token (60 requests/hour limit)\n" +
+                "Add VITE_GITHUB_TOKEN to .env to get 5,000 requests/hour"
+              : "✅ GitHub token is working! (5,000 requests/hour)");
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = "❌ ERROR!\n\n" + error.message;
+        }
+      }
+
+      // Auto-run rate limit test on page load
+      window.addEventListener("load", () => {
+        setTimeout(testRateLimit, 500);
+      });
+    </script>
+  </body>
+</html>

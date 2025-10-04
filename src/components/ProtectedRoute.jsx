@@ -2,7 +2,10 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProtectedRoute = ({ children }) => {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, userData } = useAuth();
+  
+  // Check if user is authenticated via localStorage
+  const isLocallyAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
 
   if (loading) {
     return (
@@ -15,7 +18,8 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!currentUser) {
+  // Allow access if Firebase user exists OR localStorage shows authenticated
+  if (!currentUser && !isLocallyAuthenticated && !userData) {
     return <Navigate to="/login" />;
   }
 

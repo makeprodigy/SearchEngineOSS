@@ -21,11 +21,7 @@ function App() {
               {/* Public routes without header */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
-              <Route path="/onboarding" element={
-                <ProtectedRoute>
-                  <OnboardingPage />
-                </ProtectedRoute>
-              } />
+              <Route path="/onboarding" element={<OnboardingPage />} />
 
               {/* Routes with header */}
               <Route path="/*" element={

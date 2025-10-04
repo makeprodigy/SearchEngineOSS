@@ -1,11 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Code2, User, Bookmark, LogOut, LogIn } from 'lucide-react';
-import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../contexts/AuthContext';
 
 const Header = () => {
   const { currentUser, userData, signout } = useAuth();
   const navigate = useNavigate();
+
+  // Check if user is authenticated via Firebase OR localStorage
+  const isAuthenticated = currentUser || userData || localStorage.getItem('isAuthenticated') === 'true';
 
   const handleSignOut = async () => {
     try {
@@ -28,9 +30,7 @@ const Header = () => {
 
           {/* Navigation */}
           <nav className="flex items-center gap-4">
-            <ThemeToggle />
-
-            {currentUser ? (
+            {isAuthenticated ? (
               <>
                 <Link
                   to="/saved"

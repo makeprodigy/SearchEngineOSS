@@ -2,17 +2,95 @@
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN; // Optional: Add token for higher rate limits
 
-// Cache to store recent API responses
-const cache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// Validate GitHub token configuration
+if (!GITHUB_TOKEN || GITHUB_TOKEN === 'YOUR_GITHUB_TOKEN_HERE') {
+  console.warn('⚠️ GitHub token is not configured!');
+  console.warn('📝 Add your token to .env file: VITE_GITHUB_TOKEN=your_token_here');
+  console.warn('📖 See GITHUB_API_SETUP.md for instructions.');
+  console.warn('⚡ Rate limit: 60 requests/hour (5,000 with token)');
+} else {
+  console.log('✅ GitHub token configured - you have 5,000 requests/hour!');
+}
 
-// Rate limiting
+// Enhanced cache configuration with multiple durations
+const CACHE_DURATIONS = {
+  SEARCH: 10 * 60 * 1000,      // 10 minutes for search results
+  TRENDING: 30 * 60 * 1000,    // 30 minutes for trending repos (changes slowly)
+  POPULAR: 60 * 60 * 1000,     // 1 hour for popular repos (very stable)
+  REPO_DETAILS: 15 * 60 * 1000, // 15 minutes for repo details
+  CONTRIBUTORS: 30 * 60 * 1000, // 30 minutes for contributors
+  DEFAULT: 10 * 60 * 1000       // 10 minutes default
+};
+
+// In-memory cache
+const cache = new Map();
+
+// Persistent cache using localStorage
+const STORAGE_KEY_PREFIX = 'gh_cache_';
+const STORAGE_EXPIRY_KEY = 'gh_cache_expiry_';
+
+// Request deduplication - track in-flight requests
+const inflightRequests = new Map();
+
+// Rate limit tracking
+let rateLimitRemaining = null;
+let rateLimitReset = null;
+let rateLimitLimit = null; // Total limit (60 without token, 5000 with token)
+
+// Load cache from localStorage on initialization
+let cacheLoadAttempted = false;
+const loadCacheFromStorage = () => {
+  if (cacheLoadAttempted) return;
+  cacheLoadAttempted = true;
+  
+  // Check if localStorage is available
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+  
+  try {
+    const keys = Object.keys(localStorage);
+    let loadedCount = 0;
+    
+    keys.forEach(key => {
+      if (key.startsWith(STORAGE_KEY_PREFIX)) {
+        const cacheKey = key.replace(STORAGE_KEY_PREFIX, '');
+        const expiryKey = `${STORAGE_EXPIRY_KEY}${cacheKey}`;
+        const expiryTime = localStorage.getItem(expiryKey);
+        
+        if (expiryTime && Date.now() < parseInt(expiryTime, 10)) {
+          const data = JSON.parse(localStorage.getItem(key));
+          cache.set(cacheKey, { data, timestamp: Date.now() });
+          loadedCount++;
+        } else {
+          // Clean up expired entries
+          localStorage.removeItem(key);
+          localStorage.removeItem(expiryKey);
+        }
+      }
+    });
+    
+    if (loadedCount > 0) {
+      console.log(`📦 Loaded ${loadedCount} cached items from localStorage`);
+    }
+  } catch (error) {
+    console.warn('Failed to load cache from localStorage:', error);
+  }
+};
+
+// Rate limiting - removed artificial delays when using token
 let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 1000; // 1 second between requests
+const MIN_REQUEST_INTERVAL = GITHUB_TOKEN ? 0 : 200; // No delay with token, minimal delay without
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const fetchWithRateLimit = async (url, options = {}) => {
+  // Check for in-flight duplicate requests
+  if (inflightRequests.has(url)) {
+    console.log(`⏳ Deduplicating request to ${url}`);
+    return inflightRequests.get(url);
+  }
+
   // Enforce rate limiting
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
@@ -28,35 +106,90 @@ const fetchWithRateLimit = async (url, options = {}) => {
 
   if (GITHUB_TOKEN) {
     headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+  } else {
+    console.warn('⚠️ Making API request WITHOUT token - limited to 60 requests/hour');
   }
 
-  const response = await fetch(url, { ...options, headers });
-  
-  if (!response.ok) {
-    if (response.status === 403) {
-      const resetTime = response.headers.get('X-RateLimit-Reset');
-      throw new Error(`GitHub API rate limit exceeded. Resets at ${new Date(resetTime * 1000).toLocaleTimeString()}`);
+  // Create the request promise
+  const requestPromise = (async () => {
+    try {
+      const response = await fetch(url, { ...options, headers });
+      
+      // Track rate limit info from response headers
+      const remaining = response.headers.get('X-RateLimit-Remaining');
+      const reset = response.headers.get('X-RateLimit-Reset');
+      const limit = response.headers.get('X-RateLimit-Limit');
+      
+      if (remaining !== null) {
+        rateLimitRemaining = parseInt(remaining, 10);
+        rateLimitReset = parseInt(reset, 10) * 1000;
+        rateLimitLimit = parseInt(limit, 10);
+        
+        // Warn if getting low on rate limit
+        if (rateLimitRemaining < 100 && rateLimitRemaining % 10 === 0) {
+          console.warn(`⚠️ GitHub API rate limit: ${rateLimitRemaining} requests remaining`);
+        }
+      }
+      
+      if (!response.ok) {
+        if (response.status === 403) {
+          const resetTime = response.headers.get('X-RateLimit-Reset');
+          const resetDate = new Date(resetTime * 1000);
+          throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate.toLocaleTimeString()}`);
+        }
+        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+      }
+
+      return response.json();
+    } finally {
+      // Remove from in-flight requests when done
+      inflightRequests.delete(url);
     }
-    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-  }
+  })();
 
-  return response.json();
+  // Store in-flight request
+  inflightRequests.set(url, requestPromise);
+  
+  return requestPromise;
 };
 
 // Get cached data if available and fresh
-const getCached = (key) => {
+const getCached = (key, cacheDuration = CACHE_DURATIONS.DEFAULT) => {
+  // Load cache from localStorage on first use
+  loadCacheFromStorage();
+  
   const cached = cache.get(key);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+  if (cached && Date.now() - cached.timestamp < cacheDuration) {
     return cached.data;
   }
   cache.delete(key);
   return null;
 };
 
-// Store data in cache
-const setCache = (key, data) => {
+// Store data in cache (both memory and localStorage)
+const setCache = (key, data, cacheDuration = CACHE_DURATIONS.DEFAULT) => {
   cache.set(key, { data, timestamp: Date.now() });
+  
+  // Also store in localStorage for persistence (if available)
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${key}`, JSON.stringify(data));
+      localStorage.setItem(`${STORAGE_EXPIRY_KEY}${key}`, (Date.now() + cacheDuration).toString());
+    } catch (error) {
+      // localStorage might be full or disabled - just continue without persistence
+      console.warn('Failed to persist cache to localStorage:', error);
+    }
+  }
 };
+
+// Export rate limit info
+export const getRateLimitInfo = () => ({
+  remaining: rateLimitRemaining,
+  reset: rateLimitReset,
+  resetDate: rateLimitReset ? new Date(rateLimitReset) : null,
+  limit: rateLimitLimit,
+  hasToken: rateLimitLimit >= 5000, // Token gives 5000 requests/hour
+});
 
 /**
  * Search repositories on GitHub
@@ -68,8 +201,11 @@ const setCache = (key, data) => {
  */
 export const searchRepositories = async (query, perPage = 30, page = 1, sort = 'stars') => {
   const cacheKey = `search:${query}:${perPage}:${page}:${sort}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
+  const cached = getCached(cacheKey, CACHE_DURATIONS.SEARCH);
+  if (cached) {
+    console.log(`✅ Cache hit for search: ${query}`);
+    return cached;
+  }
 
   const searchQuery = query || 'stars:>1000'; // Default to popular repos
   const url = `${GITHUB_API_BASE}/search/repositories?q=${encodeURIComponent(searchQuery)}&per_page=${perPage}&page=${page}&sort=${sort}`;
@@ -77,7 +213,7 @@ export const searchRepositories = async (query, perPage = 30, page = 1, sort = '
   try {
     const data = await fetchWithRateLimit(url);
     const results = data.items || [];
-    setCache(cacheKey, results);
+    setCache(cacheKey, results, CACHE_DURATIONS.SEARCH);
     return results;
   } catch (error) {
     console.error('Error searching repositories:', error);
@@ -93,14 +229,14 @@ export const searchRepositories = async (query, perPage = 30, page = 1, sort = '
  */
 export const getRepository = async (owner, repo) => {
   const cacheKey = `repo:${owner}/${repo}`;
-  const cached = getCached(cacheKey);
+  const cached = getCached(cacheKey, CACHE_DURATIONS.REPO_DETAILS);
   if (cached) return cached;
 
   const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}`;
   
   try {
     const data = await fetchWithRateLimit(url);
-    setCache(cacheKey, data);
+    setCache(cacheKey, data, CACHE_DURATIONS.REPO_DETAILS);
     return data;
   } catch (error) {
     console.error(`Error fetching repository ${owner}/${repo}:`, error);
@@ -116,35 +252,71 @@ export const getRepository = async (owner, repo) => {
  */
 export const getContributorsCount = async (owner, repo) => {
   const cacheKey = `contributors:${owner}/${repo}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
+  const cached = getCached(cacheKey, CACHE_DURATIONS.CONTRIBUTORS);
+  if (cached !== null && cached !== undefined) {
+    const numericValue = Number(cached);
+    console.log(`📦 Cache hit - Contributors for ${owner}/${repo}: ${numericValue} (type: ${typeof numericValue})`);
+    return numericValue;
+  }
 
-  const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/contributors?per_page=1`;
-  
   try {
-    const response = await fetch(url, {
-      method: 'HEAD',
-      headers: GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {}
-    });
+    // Use per_page=1 with anon=true to get total count from headers
+    const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/contributors?per_page=1&anon=true`;
     
+    const headers = {
+      'Accept': 'application/vnd.github.v3+json',
+    };
+    
+    if (GITHUB_TOKEN) {
+      headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+    }
+    
+    const response = await fetch(url, { headers });
+    
+    if (!response.ok) {
+      if (response.status === 403) {
+        const resetTime = response.headers.get('X-RateLimit-Reset');
+        console.error(`❌ GitHub API rate limit exceeded for contributors. Resets at ${new Date(resetTime * 1000).toLocaleTimeString()}`);
+        console.error(`💡 Add VITE_GITHUB_TOKEN to .env file to get 5,000 requests/hour!`);
+      } else {
+        console.warn(`Contributors API returned ${response.status} for ${owner}/${repo}`);
+      }
+      // Return estimate based on forks
+      const estimate = Math.max(1, Math.floor((await getRepository(owner, repo)).forks_count / 20));
+      console.log(`📊 Contributors estimate for ${owner}/${repo}: ${estimate} (type: ${typeof estimate})`);
+      return estimate;
+    }
+    
+    // Check Link header for pagination
     const linkHeader = response.headers.get('Link');
     if (linkHeader) {
       const matches = linkHeader.match(/page=(\d+)>; rel="last"/);
       if (matches) {
-        const count = parseInt(matches[1]);
-        setCache(cacheKey, count);
+        const count = parseInt(matches[1], 10);
+        console.log(`✅ Contributors for ${owner}/${repo}: ${count} (from pagination, type: ${typeof count})`);
+        setCache(cacheKey, count, CACHE_DURATIONS.CONTRIBUTORS);
         return count;
       }
     }
     
-    // If no Link header, fetch the actual list (small repo)
-    const data = await fetchWithRateLimit(`${GITHUB_API_BASE}/repos/${owner}/${repo}/contributors?per_page=100`);
-    const count = data.length;
-    setCache(cacheKey, count);
+    // No pagination means all contributors fit in one page
+    const data = await response.json();
+    const count = Array.isArray(data) ? data.length : 1;
+    console.log(`✅ Contributors for ${owner}/${repo}: ${count} (no pagination, type: ${typeof count})`);
+    setCache(cacheKey, count, CACHE_DURATIONS.CONTRIBUTORS);
     return count;
   } catch (error) {
     console.error(`Error fetching contributors for ${owner}/${repo}:`, error);
-    return 0;
+    // Return estimate instead of 0
+    try {
+      const repoData = await getRepository(owner, repo);
+      const fallback = Math.max(1, Math.floor(repoData.forks_count / 20));
+      console.log(`⚠️ Contributors fallback for ${owner}/${repo}: ${fallback} (type: ${typeof fallback})`);
+      return fallback;
+    } catch {
+      console.log(`⚠️ Contributors minimum for ${owner}/${repo}: 1`);
+      return 1; // At least the owner
+    }
   }
 };
 
@@ -156,7 +328,7 @@ export const getContributorsCount = async (owner, repo) => {
  */
 export const getGoodFirstIssues = async (owner, repo) => {
   const cacheKey = `goodfirst:${owner}/${repo}`;
-  const cached = getCached(cacheKey);
+  const cached = getCached(cacheKey, CACHE_DURATIONS.REPO_DETAILS);
   if (cached !== null) return cached;
 
   const labels = ['good first issue', 'good-first-issue', 'beginner', 'beginner-friendly', 'first-timers-only'];
@@ -165,10 +337,41 @@ export const getGoodFirstIssues = async (owner, repo) => {
   try {
     const data = await fetchWithRateLimit(url);
     const count = data.total_count || 0;
-    setCache(cacheKey, count);
+    setCache(cacheKey, count, CACHE_DURATIONS.REPO_DETAILS);
     return count;
   } catch (error) {
     console.error(`Error fetching good first issues for ${owner}/${repo}:`, error);
+    return 0;
+  }
+};
+
+/**
+ * Get active (open) pull requests count
+ * NOTE: This fetches OPEN PRs, not merged PRs
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @returns {Promise<number>} Number of active (open) PRs
+ */
+export const getActivePRsCount = async (owner, repo) => {
+  const cacheKey = `activeprs:${owner}/${repo}`;
+  const cached = getCached(cacheKey, CACHE_DURATIONS.REPO_DETAILS);
+  if (cached !== null && cached !== undefined) {
+    const numericValue = Number(cached);
+    console.log(`📦 Cache hit - Active PRs for ${owner}/${repo}: ${numericValue} (type: ${typeof numericValue})`);
+    return numericValue;
+  }
+
+  try {
+    // Fetch OPEN pull requests (not merged)
+    const url = `${GITHUB_API_BASE}/search/issues?q=repo:${owner}/${repo}+is:pr+is:open&per_page=1`;
+    const data = await fetchWithRateLimit(url);
+    const count = Number(data.total_count) || 0;
+    console.log(`✅ Active (OPEN) PRs for ${owner}/${repo}: ${count} (type: ${typeof count})`);
+    setCache(cacheKey, count, CACHE_DURATIONS.REPO_DETAILS);
+    return count;
+  } catch (error) {
+    console.error(`Error fetching active PRs for ${owner}/${repo}:`, error);
+    console.log(`⚠️ Active PRs fallback for ${owner}/${repo}: 0`);
     return 0;
   }
 };
@@ -181,7 +384,7 @@ export const getGoodFirstIssues = async (owner, repo) => {
  */
 export const getCommitActivity = async (owner, repo) => {
   const cacheKey = `commits:${owner}/${repo}`;
-  const cached = getCached(cacheKey);
+  const cached = getCached(cacheKey, CACHE_DURATIONS.REPO_DETAILS);
   if (cached) return cached;
 
   const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/stats/commit_activity`;
@@ -197,7 +400,7 @@ export const getCommitActivity = async (owner, repo) => {
     const lastMonth = data.slice(-4).reduce((sum, week) => sum + (week.total || 0), 0);
     
     const result = { lastWeek, lastMonth };
-    setCache(cacheKey, result);
+    setCache(cacheKey, result, CACHE_DURATIONS.REPO_DETAILS);
     return result;
   } catch (error) {
     console.error(`Error fetching commit activity for ${owner}/${repo}:`, error);
@@ -218,7 +421,7 @@ export const getIssueHistory = async (owner, repo) => {
   const openIssues = currentIssues.open_issues_count || 0;
   
   // Generate approximate history with some variance
-  return Array.from({ length: 12 }, (_, i) => {
+  return Array.from({ length: 12 }, () => {
     const variance = Math.random() * 0.3 - 0.15; // ±15% variance
     return Math.max(0, Math.round(openIssues * (1 + variance)));
   });
@@ -231,14 +434,47 @@ export const getIssueHistory = async (owner, repo) => {
  * @returns {Object} Repository in app format
  */
 export const transformRepository = async (githubRepo, additionalData = {}) => {
-  const owner = githubRepo.owner.login;
-  const name = githubRepo.name;
+  // Use provided additional data or smart estimates
+  // Estimate contributors from watchers/forks if not provided (rough heuristic)
+  const estimatedContributors = Math.max(
+    Math.floor((githubRepo.watchers_count || 0) / 10),
+    Math.floor((githubRepo.forks_count || 0) / 20),
+    1 // At least 1 contributor (the owner)
+  );
   
-  // Use provided additional data or defaults
-  const contributors = additionalData.contributors ?? 0;
-  const goodFirstIssues = additionalData.goodFirstIssues ?? 0;
+  // Ensure contributors is an integer
+  const contributors = additionalData.contributors !== undefined 
+    ? parseInt(additionalData.contributors, 10) 
+    : estimatedContributors;
+  
+  console.log(`📊 Transforming ${githubRepo.full_name}:`, {
+    additionalData: additionalData.contributors,
+    estimated: estimatedContributors,
+    final: contributors,
+    watchers: githubRepo.watchers_count,
+    forks: githubRepo.forks_count
+  });
+  
+  // Ensure all numeric fields are integers
+  const goodFirstIssues = additionalData.goodFirstIssues !== undefined 
+    ? parseInt(additionalData.goodFirstIssues, 10) 
+    : 0;
+  const activePRs = additionalData.activePRs !== undefined 
+    ? parseInt(additionalData.activePRs, 10) 
+    : 0;
   const commits = additionalData.commits ?? { lastWeek: 0, lastMonth: 0 };
   const issueHistory = additionalData.issueHistory ?? Array(12).fill(githubRepo.open_issues_count || 0);
+  
+  console.log(`🔢 Numeric values for ${githubRepo.full_name}:`, {
+    contributors,
+    activePRs,
+    goodFirstIssues,
+    types: {
+      contributors: typeof contributors,
+      activePRs: typeof activePRs,
+      goodFirstIssues: typeof goodFirstIssues
+    }
+  });
 
   // Calculate health score
   const healthScore = calculateHealthScore({
@@ -255,15 +491,15 @@ export const transformRepository = async (githubRepo, additionalData = {}) => {
     fullName: githubRepo.full_name,
     description: githubRepo.description || 'No description available',
     owner: githubRepo.owner.login,
-    stars: githubRepo.stargazers_count,
-    forks: githubRepo.forks_count,
-    watchers: githubRepo.watchers_count,
-    openIssues: githubRepo.open_issues_count,
+    stars: parseInt(githubRepo.stargazers_count, 10) || 0,
+    forks: parseInt(githubRepo.forks_count, 10) || 0,
+    watchers: parseInt(githubRepo.watchers_count, 10) || 0,
+    openIssues: parseInt(githubRepo.open_issues_count, 10) || 0,
     contributors,
     goodFirstIssues,
     license: githubRepo.license?.spdx_id || githubRepo.license?.name || 'No License',
     lastCommitDate: githubRepo.pushed_at ? new Date(githubRepo.pushed_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    activePRs: 0, // GitHub doesn't provide this easily, would need separate call
+    activePRs,
     language: githubRepo.language || 'Unknown',
     topics: githubRepo.topics || [],
     issueHistory,
@@ -279,13 +515,26 @@ export const transformRepository = async (githubRepo, additionalData = {}) => {
 const calculateHealthScore = (repo) => {
   let score = 0;
   
+  // Ensure all values are integers
+  const contributors = parseInt(repo.contributors, 10) || 0;
+  const stars = parseInt(repo.stars, 10) || 0;
+  const openIssues = parseInt(repo.openIssues, 10) || 0;
+  const lastMonthCommits = parseInt(repo.commits?.lastMonth, 10) || 0;
+  
+  console.log(`💯 Calculating health score with:`, {
+    contributors,
+    stars,
+    openIssues,
+    lastMonthCommits
+  });
+  
   // Activity score (30 points)
-  const activityScore = Math.min(30, (repo.commits.lastMonth / 100) * 30);
+  const activityScore = Math.min(30, (lastMonthCommits / 100) * 30);
   score += activityScore;
   
   // Community engagement (25 points)
-  const contributorsScore = Math.min(15, (repo.contributors / 1000) * 15);
-  const starsScore = Math.min(10, (repo.stars / 50000) * 10);
+  const contributorsScore = Math.min(15, (contributors / 1000) * 15);
+  const starsScore = Math.min(10, (stars / 50000) * 10);
   score += contributorsScore + starsScore;
   
   // Maintenance (25 points)
@@ -298,7 +547,7 @@ const calculateHealthScore = (repo) => {
   score += maintenanceScore;
   
   // Issue management (20 points)
-  const issueRatio = repo.openIssues / (repo.stars / 100);
+  const issueRatio = openIssues / (stars / 100);
   const issueScore = issueRatio < 1 ? 20 :
                     issueRatio < 2 ? 15 :
                     issueRatio < 5 ? 10 : 5;
@@ -310,39 +559,85 @@ const calculateHealthScore = (repo) => {
 /**
  * Fetch enriched repository data (with all additional info)
  * @param {Object} githubRepo - Basic repository data from search
- * @param {boolean} fetchAll - Whether to fetch all additional data
+ * @param {boolean|string} fetchAdditionalData - true: fetch all, false: use estimates, 'lazy': use cache only
  * @returns {Promise<Object>} Enriched repository
  */
-export const enrichRepository = async (githubRepo, fetchAll = false) => {
+export const enrichRepository = async (githubRepo, fetchAdditionalData = true) => {
   const owner = githubRepo.owner.login;
   const name = githubRepo.name;
   
-  if (!fetchAll) {
-    // Quick transform without additional API calls
+  console.log(`🔍 Enriching ${owner}/${name}, fetchAdditionalData=${fetchAdditionalData}`);
+  
+  if (fetchAdditionalData === false) {
+    // Quick transform with estimates only
+    console.log(`⚡ Using estimates only for ${owner}/${name}`);
+    return transformRepository(githubRepo);
+  }
+  
+  if (fetchAdditionalData === 'lazy') {
+    // Only use cached data, don't make new API calls
+    const contributorsCacheKey = `contributors:${owner}/${name}`;
+    const prsCacheKey = `activeprs:${owner}/${name}`;
+    
+    const cachedContributors = getCached(contributorsCacheKey, CACHE_DURATIONS.CONTRIBUTORS);
+    const cachedPRs = getCached(prsCacheKey, CACHE_DURATIONS.REPO_DETAILS);
+    
+    if (cachedContributors !== null && cachedPRs !== null) {
+      console.log(`⚡ Using cached data only for ${owner}/${name}`);
+      return transformRepository(githubRepo, {
+        contributors: Number(cachedContributors),
+        activePRs: Number(cachedPRs),
+      });
+    }
+    
+    // No cache available, use estimates
+    console.log(`⚡ No cache available, using estimates for ${owner}/${name}`);
     return transformRepository(githubRepo);
   }
   
   try {
-    // Fetch additional data in parallel
-    const [contributors, goodFirstIssues, commits] = await Promise.all([
+    // Fetch contributors and active PRs in parallel (most important for UI)
+    console.log(`🌐 Fetching additional data for ${owner}/${name}...`);
+    const [contributors, activePRs] = await Promise.all([
       getContributorsCount(owner, name),
-      getGoodFirstIssues(owner, name),
-      getCommitActivity(owner, name),
+      getActivePRsCount(owner, name)
     ]);
-    
-    const issueHistory = await getIssueHistory(owner, name);
+    console.log(`✅ Got ${contributors} contributors and ${activePRs} active PRs for ${owner}/${name}`);
     
     return transformRepository(githubRepo, {
       contributors,
-      goodFirstIssues,
-      commits,
-      issueHistory,
+      activePRs,
     });
   } catch (error) {
-    console.error(`Error enriching repository ${owner}/${name}:`, error);
-    // Return basic transform if enrichment fails
+    console.error(`❌ Error enriching repository ${owner}/${name}:`, error);
+    // Return basic transform with estimates if enrichment fails
     return transformRepository(githubRepo);
   }
+};
+
+/**
+ * Batch enrich repositories with optional lazy loading
+ * This reduces API calls by only enriching a subset of repos fully
+ * @param {Array} repos - Array of repository objects
+ * @param {number} fullEnrichCount - Number of repos to fully enrich (default: 6)
+ * @returns {Promise<Array>} Enriched repositories
+ */
+export const batchEnrichRepositories = async (repos, fullEnrichCount = 6) => {
+  if (repos.length === 0) return [];
+  
+  console.log(`📦 Batch enriching: ${fullEnrichCount} full, ${repos.length - fullEnrichCount} lazy`);
+  
+  // Split repos into full enrichment and lazy enrichment
+  const reposToEnrichFully = repos.slice(0, fullEnrichCount);
+  const reposToEnrichLazy = repos.slice(fullEnrichCount);
+  
+  // Process in parallel
+  const [fullyEnriched, lazilyEnriched] = await Promise.all([
+    Promise.all(reposToEnrichFully.map(repo => enrichRepository(repo, true))),
+    Promise.all(reposToEnrichLazy.map(repo => enrichRepository(repo, 'lazy')))
+  ]);
+  
+  return [...fullyEnriched, ...lazilyEnriched];
 };
 
 /**
@@ -352,8 +647,11 @@ export const enrichRepository = async (githubRepo, fetchAll = false) => {
  */
 export const getTrendingRepos = async (limit = 6) => {
   const cacheKey = `trending:${limit}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
+  const cached = getCached(cacheKey, CACHE_DURATIONS.TRENDING);
+  if (cached) {
+    console.log(`✅ Cache hit for trending repos`);
+    return cached;
+  }
 
   // Get repos created in the last month with most stars
   const date = new Date();
@@ -363,9 +661,9 @@ export const getTrendingRepos = async (limit = 6) => {
   try {
     const repos = await searchRepositories(`created:>${dateString}`, limit, 1, 'stars');
     const enriched = await Promise.all(
-      repos.slice(0, limit).map(repo => enrichRepository(repo, false))
+      repos.slice(0, limit).map(repo => enrichRepository(repo, true))
     );
-    setCache(cacheKey, enriched);
+    setCache(cacheKey, enriched, CACHE_DURATIONS.TRENDING);
     return enriched;
   } catch (error) {
     console.error('Error fetching trending repos:', error);
@@ -380,15 +678,18 @@ export const getTrendingRepos = async (limit = 6) => {
  */
 export const getPopularRepos = async (limit = 6) => {
   const cacheKey = `popular:${limit}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
+  const cached = getCached(cacheKey, CACHE_DURATIONS.POPULAR);
+  if (cached) {
+    console.log(`✅ Cache hit for popular repos`);
+    return cached;
+  }
 
   try {
     const repos = await searchRepositories('stars:>50000', limit, 1, 'stars');
     const enriched = await Promise.all(
-      repos.slice(0, limit).map(repo => enrichRepository(repo, false))
+      repos.slice(0, limit).map(repo => enrichRepository(repo, true))
     );
-    setCache(cacheKey, enriched);
+    setCache(cacheKey, enriched, CACHE_DURATIONS.POPULAR);
     return enriched;
   } catch (error) {
     console.error('Error fetching popular repos:', error);
@@ -400,9 +701,11 @@ export const getPopularRepos = async (limit = 6) => {
  * Search repositories with filters
  * @param {string} query - Search query
  * @param {Object} filters - Filter options
- * @returns {Promise<Array>} Array of repositories
+ * @param {number} page - Page number (default: 1)
+ * @param {number} perPage - Results per page (default: 30)
+ * @returns {Promise<Object>} Object with results and hasMore flag
  */
-export const searchWithFilters = async (query, filters = {}) => {
+export const searchWithFilters = async (query, filters = {}, page = 1, perPage = 30) => {
   let searchQuery = query || '';
   
   // Build GitHub search query from filters
@@ -433,10 +736,10 @@ export const searchWithFilters = async (query, filters = {}) => {
   else if (filters.sortBy === 'goodFirstIssues') sort = 'help-wanted-issues';
   
   try {
-    const repos = await searchRepositories(finalQuery, 30, 1, sort);
-    const enriched = await Promise.all(
-      repos.map(repo => enrichRepository(repo, false))
-    );
+    const repos = await searchRepositories(finalQuery, perPage, page, sort);
+    
+    // Use batch enrichment to reduce API calls (fully enrich first 10, lazy enrich rest)
+    const enriched = await batchEnrichRepositories(repos, 10);
     
     // Apply additional client-side filters that GitHub doesn't support
     let filtered = enriched;
@@ -458,7 +761,10 @@ export const searchWithFilters = async (query, filters = {}) => {
       });
     }
     
-    return filtered;
+    return {
+      results: filtered,
+      hasMore: repos.length === perPage // If we got full page, there might be more
+    };
   } catch (error) {
     console.error('Error searching with filters:', error);
     throw error;
@@ -466,9 +772,30 @@ export const searchWithFilters = async (query, filters = {}) => {
 };
 
 /**
- * Clear the cache
+ * Clear the cache (both memory and localStorage)
  */
 export const clearCache = () => {
   cache.clear();
+  
+  // Clear localStorage cache as well
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const keys = Object.keys(localStorage);
+      let clearedCount = 0;
+      
+      keys.forEach(key => {
+        if (key.startsWith(STORAGE_KEY_PREFIX) || key.startsWith(STORAGE_EXPIRY_KEY)) {
+          localStorage.removeItem(key);
+          clearedCount++;
+        }
+      });
+      
+      console.log(`🧹 Cleared ${clearedCount} cached items from localStorage`);
+    } catch (error) {
+      console.warn('Failed to clear localStorage cache:', error);
+    }
+  }
+  
+  console.log('✅ Cache cleared successfully');
 };
 

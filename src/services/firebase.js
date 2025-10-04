@@ -9,7 +9,7 @@ import {
   onAuthStateChanged 
 } from 'firebase/auth';
 import { 
-  getFirestore, 
+  initializeFirestore,
   doc, 
   setDoc, 
   getDoc, 
@@ -18,25 +18,53 @@ import {
   arrayRemove 
 } from 'firebase/firestore';
 
-// Firebase configuration
-// Replace with your Firebase config
+// Firebase configuration from environment variables
+// Set these in your .env file
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
+// Validate Firebase configuration
+const isFirebaseConfigured = firebaseConfig.apiKey && 
+  firebaseConfig.apiKey !== 'YOUR_API_KEY' &&
+  firebaseConfig.projectId && 
+  firebaseConfig.projectId !== 'YOUR_PROJECT_ID';
+
+if (!isFirebaseConfigured) {
+  console.warn('⚠️ Firebase is not configured. Authentication features will be disabled.');
+  console.warn('📝 Add your Firebase credentials to .env file to enable auth.');
+  console.warn('📖 See FIREBASE_SETUP.md for instructions.');
+  console.warn('💡 You can still browse repositories without authentication!');
+}
+
+// Initialize Firebase only if properly configured
+let app, auth, db, googleProvider;
+
+if (isFirebaseConfigured) {
+  try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    // Use auto-detected long polling to avoid WebChannel transport issues in some networks
+    db = initializeFirestore(app, { experimentalForceLongPolling: true, experimentalAutoDetectLongPolling: true });
+    googleProvider = new GoogleAuthProvider();
+    console.log('✅ Firebase configured successfully!');
+  } catch (error) {
+    console.error('❌ Firebase initialization failed:', error.message);
+    console.warn('⚠️ Authentication features will be disabled.');
+  }
+}
 
 // Auth functions
 export const signUpWithEmail = async (email, password, displayName) => {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase is not configured. Please set up Firebase credentials in .env file.');
+  }
+  
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
@@ -60,6 +88,10 @@ export const signUpWithEmail = async (email, password, displayName) => {
 };
 
 export const signInWithEmail = async (email, password) => {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase is not configured. Please set up Firebase credentials in .env file.');
+  }
+  
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return userCredential.user;
@@ -69,6 +101,10 @@ export const signInWithEmail = async (email, password) => {
 };
 
 export const signInWithGoogle = async () => {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase is not configured. Please set up Firebase credentials in .env file.');
+  }
+  
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
@@ -96,6 +132,10 @@ export const signInWithGoogle = async () => {
 };
 
 export const logout = async () => {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase is not configured.');
+  }
+  
   try {
     await signOut(auth);
   } catch (error) {
@@ -105,6 +145,11 @@ export const logout = async () => {
 
 // User data functions
 export const getUserData = async (uid) => {
+  if (!isFirebaseConfigured) {
+    console.warn('Firebase not configured, returning null user data');
+    return null;
+  }
+  
   try {
     const userDoc = await getDoc(doc(db, 'users', uid));
     if (userDoc.exists()) {
@@ -117,14 +162,23 @@ export const getUserData = async (uid) => {
 };
 
 export const updateUserData = async (uid, data) => {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase is not configured. Cannot update user data.');
+  }
+  
   try {
-    await updateDoc(doc(db, 'users', uid), data);
+    // Use setDoc with merge to create document if it doesn't exist yet
+    await setDoc(doc(db, 'users', uid), data, { merge: true });
   } catch (error) {
     throw error;
   }
 };
 
 export const saveRepo = async (uid, repoId) => {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase is not configured. Cannot save repositories.');
+  }
+  
   try {
     await updateDoc(doc(db, 'users', uid), {
       savedRepos: arrayUnion(repoId)
@@ -135,6 +189,10 @@ export const saveRepo = async (uid, repoId) => {
 };
 
 export const unsaveRepo = async (uid, repoId) => {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase is not configured. Cannot unsave repositories.');
+  }
+  
   try {
     await updateDoc(doc(db, 'users', uid), {
       savedRepos: arrayRemove(repoId)
@@ -144,5 +202,7 @@ export const unsaveRepo = async (uid, repoId) => {
   }
 };
 
+// Export Firebase instances and helper
 export { auth, db, onAuthStateChanged };
+export { isFirebaseConfigured };
 

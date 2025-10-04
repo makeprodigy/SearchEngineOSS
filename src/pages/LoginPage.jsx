@@ -27,10 +27,11 @@ const LoginPage = () => {
 
     try {
       await signin(formData.email, formData.password);
+      // Navigate to home page on success
       navigate('/');
     } catch (error) {
+      console.error('Sign in error:', error);
       setError(error.message || 'Failed to sign in. Please check your credentials.');
-    } finally {
       setLoading(false);
     }
   };
@@ -41,10 +42,11 @@ const LoginPage = () => {
 
     try {
       await signinWithGoogle();
+      // Navigate to home page on success
       navigate('/');
     } catch (error) {
+      console.error('Google sign-in error:', error);
       setError(error.message || 'Failed to sign in with Google.');
-    } finally {
       setLoading(false);
     }
   };
