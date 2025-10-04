@@ -164,9 +164,10 @@ const SearchPage = () => {
           <SearchBar 
             onSearch={handleSearch}
             placeholder="Search repositories on GitHub..."
+            className="max-w-4xl mx-auto"
           />
           
-          <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center justify-between mt-4 max-w-4xl mx-auto">
             {/* Mobile Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
