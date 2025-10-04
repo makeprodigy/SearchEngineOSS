@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+  
+  --color-secondary-50: #1a1a1a;
+  --color-secondary-100: #0f0f0f;
+  --color-secondary-200: #0a0a0a;
+  --color-secondary-300: #050505;
+  --color-secondary-400: #030303;
+  --color-secondary-500: #000000;
+  --color-secondary-600: #000000;
+  --color-secondary-700: #000000;
+  --color-secondary-800: #000000;
+  --color-secondary-900: #000000;
+}
+
+body {
+  background-color: white;
+  color: rgb(17 24 39);
+}
+
+.dark body {
+  background-color: rgb(17 24 39);
+  color: rgb(243 244 246);
+}
+
+.btn-primary {
+  background-color: var(--color-primary-600);
+  color: white;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-700);
+}
+
+.btn-secondary {
+  background-color: rgb(229 231 235);
+  color: rgb(17 24 39);
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.dark .btn-secondary {
+  background-color: rgb(55 65 81);
+  color: rgb(243 244 246);
+}
+
+.btn-secondary:hover {
+  background-color: rgb(209 213 219);
+}
+
+.dark .btn-secondary:hover {
+  background-color: rgb(75 85 99);
+}
+
+.card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  border: 1px solid rgb(229 231 235);
+  transition: box-shadow 0.2s;
+}
+
+.dark .card {
+  background-color: rgb(31 41 55);
+  border-color: rgb(55 65 81);
+}
+
+.card:hover {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+.input-field {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgb(209 213 219);
+  border-radius: 0.5rem;
+  background-color: white;
+  color: rgb(17 24 39);
+  outline: none;
+}
+
+.dark .input-field {
+  border-color: rgb(75 85 99);
+  background-color: rgb(31 41 55);
+  color: rgb(243 244 246);
+}
+
+.input-field:focus {
+  outline: 2px solid var(--color-primary-500);
+  border-color: transparent;
+}
