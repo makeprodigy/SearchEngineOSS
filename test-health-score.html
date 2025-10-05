@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Health Score Test</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #1a1a1a;
+        color: #e0e0e0;
+      }
+      h1 {
+        color: #4fc3f7;
+      }
+      h2 {
+        color: #81c784;
+        margin-top: 30px;
+      }
+      .test-case {
+        background: #2d2d2d;
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 15px 0;
+      }
+      .result {
+        background: #1e1e1e;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-family: monospace;
+      }
+      .score {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4fc3f7;
+      }
+      .breakdown {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .breakdown-item {
+        background: #333;
+        padding: 8px;
+        border-radius: 4px;
+      }
+      .label {
+        color: #9e9e9e;
+        font-size: 12px;
+      }
+      .value {
+        color: #fff;
+        font-weight: bold;
+      }
+      .issue {
+        background: #d32f2f;
+        color: white;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+      }
+      .fix {
+        background: #388e3c;
+        color: white;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+      }
+      pre {
+        background: #1e1e1e;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔬 Health Score Formula Test</h1>
+
+    <div class="issue">
+      <h3>🐛 Issues Found:</h3>
+      <ol>
+        <li>
+          <strong>Duplicate Health Score Function:</strong> Two different
+          calculateHealthScore functions existed - one old in github.js and one
+          new in healthScore.js
+        </li>
+        <li>
+          <strong>Missing Commit Data:</strong> enrichRepository() was NOT
+          fetching commit activity, causing all repos to score 0/30 points for
+          activity
+        </li>
+        <li>
+          <strong>Cached Old Scores:</strong> Old health scores were cached in
+          localStorage, preventing new calculations from showing
+        </li>
+      </ol>
+    </div>
+
+    <div class="fix">
+      <h3>✅ Fixes Applied:</h3>
+      <ol>
+        <li>Removed duplicate calculateHealthScore from github.js</li>
+        <li>Added import for calculateHealthScore from utils/healthScore.js</li>
+        <li>Added getCommitActivity() to enrichRepository() parallel fetch</li>
+        <li>Commit data now properly passed to health score calculation</li>
+      </ol>
+    </div>
+
+    <h2>📊 Test Cases</h2>
+
+    <div class="test-case">
+      <h3>Test 1: Active, Popular Repo</h3>
+      <pre>
+Input: {
+  stars: 100000,
+  commits: { lastMonth: 150 },
+  openIssues: 500,
+  lastCommitDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
+}</pre
+      >
+      <div class="result" id="test1"></div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test 2: Moderate Repo</h3>
+      <pre>
+Input: {
+  stars: 10000,
+  commits: { lastMonth: 20 },
+  openIssues: 150,
+  lastCommitDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) // 15 days ago
+}</pre
+      >
+      <div class="result" id="test2"></div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test 3: Inactive Repo</h3>
+      <pre>
+Input: {
+  stars: 5000,
+  commits: { lastMonth: 0 },
+  openIssues: 1000,
+  lastCommitDate: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000) // 200 days ago
+}</pre
+      >
+      <div class="result" id="test3"></div>
+    </div>
+
+    <div class="test-case">
+      <h3>Test 4: Missing Commit Data (OLD BUG)</h3>
+      <pre>
+Input: {
+  stars: 50000,
+  commits: { lastMonth: 0 }, // This was happening for ALL repos!
+  openIssues: 200,
+  lastCommitDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+}</pre
+      >
+      <div class="result" id="test4"></div>
+    </div>
+
+    <h2>🔍 How to Verify Fix in Your App</h2>
+    <ol>
+      <li>
+        Clear your browser cache and localStorage (or click "Clear Cache" in the
+        app)
+      </li>
+      <li>Refresh the page</li>
+      <li>Open browser console (F12)</li>
+      <li>
+        Look for debug logs: <code>HealthScore calc:</code> showing the
+        breakdown
+      </li>
+      <li>Verify that <code>activityScore</code> is NOT always 0</li>
+      <li>Check that health scores vary more realistically between repos</li>
+    </ol>
+
+    <script type="module">
+      // Simulate the new health score formula
+      const calculateHealthScore = (repo) => {
+        let score = 0;
+
+        const monthlyCommits = Number(repo.commits?.lastMonth || 0);
+        const activityScore = Math.min(30, (monthlyCommits / 50) * 30);
+        score += activityScore;
+
+        const stars = Number(repo.stars || 0);
+        const starScore = Math.min(25, (stars / 50000) * 25);
+        score += starScore;
+
+        const openIssues = Number(repo.openIssues || 0);
+        const issueRatio = openIssues / Math.max(1, stars / 100);
+        let issueScore = 0;
+        if (issueRatio <= 0.5) issueScore = 20;
+        else if (issueRatio <= 1) issueScore = 15;
+        else if (issueRatio <= 2) issueScore = 10;
+        else if (issueRatio <= 5) issueScore = 5;
+        else issueScore = 0;
+        issueScore = (issueScore / 20) * 20;
+        score += issueScore;
+
+        const lastCommit = new Date(repo.lastCommitDate);
+        const daysAgo = (new Date() - lastCommit) / (1000 * 60 * 60 * 24);
+        let freshnessScore = 0;
+        if (daysAgo <= 7) freshnessScore = 25;
+        else if (daysAgo <= 30) freshnessScore = 20;
+        else if (daysAgo <= 90) freshnessScore = 12;
+        else if (daysAgo <= 180) freshnessScore = 6;
+        else freshnessScore = 0;
+        score += freshnessScore;
+
+        return {
+          total: Math.round(Math.min(score, 100)),
+          breakdown: {
+            activityScore: Math.round(activityScore),
+            starScore: Math.round(starScore),
+            issueScore: Math.round(issueScore),
+            freshnessScore: Math.round(freshnessScore),
+          },
+        };
+      };
+
+      const displayResult = (elementId, result) => {
+        const el = document.getElementById(elementId);
+        el.innerHTML = `
+        <div class="score">Health Score: ${result.total}</div>
+        <div class="breakdown">
+          <div class="breakdown-item">
+            <div class="label">Activity (Commits)</div>
+            <div class="value">${result.breakdown.activityScore} / 30</div>
+          </div>
+          <div class="breakdown-item">
+            <div class="label">Stars</div>
+            <div class="value">${result.breakdown.starScore} / 25</div>
+          </div>
+          <div class="breakdown-item">
+            <div class="label">Issue Management</div>
+            <div class="value">${result.breakdown.issueScore} / 20</div>
+          </div>
+          <div class="breakdown-item">
+            <div class="label">Freshness (Recency)</div>
+            <div class="value">${result.breakdown.freshnessScore} / 25</div>
+          </div>
+        </div>
+      `;
+      };
+
+      // Run tests
+      const test1 = {
+        stars: 100000,
+        commits: { lastMonth: 150 },
+        openIssues: 500,
+        lastCommitDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      };
+
+      const test2 = {
+        stars: 10000,
+        commits: { lastMonth: 20 },
+        openIssues: 150,
+        lastCommitDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+      };
+
+      const test3 = {
+        stars: 5000,
+        commits: { lastMonth: 0 },
+        openIssues: 1000,
+        lastCommitDate: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
+      };
+
+      const test4 = {
+        stars: 50000,
+        commits: { lastMonth: 0 },
+        openIssues: 200,
+        lastCommitDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      };
+
+      displayResult("test1", calculateHealthScore(test1));
+      displayResult("test2", calculateHealthScore(test2));
+      displayResult("test3", calculateHealthScore(test3));
+      displayResult("test4", calculateHealthScore(test4));
+    </script>
+  </body>
+</html>

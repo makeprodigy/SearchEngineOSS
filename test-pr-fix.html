@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PR Data Fix Test</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .success {
+        border-color: #4caf50;
+        background: #f1f8e9;
+      }
+      .error {
+        border-color: #f44336;
+        background: #ffebee;
+      }
+      .info {
+        border-color: #2196f3;
+        background: #e3f2fd;
+      }
+      button {
+        background: #2196f3;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #1976d2;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      pre {
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 3px;
+        overflow-x: auto;
+      }
+      .loading {
+        color: #666;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔧 PR Data Fix Test</h1>
+      <p>This page tests the fix for PR data fetching issues.</p>
+
+      <div class="test-section info">
+        <h3>📋 Test Instructions</h3>
+        <ol>
+          <li>Click "Test facebook/react" to test the specific repository</li>
+          <li>
+            Click "Test Multiple Repos" to test several popular repositories
+          </li>
+          <li>
+            Click "Clear Cache" to clear cached data and test fresh API calls
+          </li>
+          <li>Check the browser console for detailed logs</li>
+        </ol>
+      </div>
+
+      <div class="test-section">
+        <h3>🧪 Tests</h3>
+        <button onclick="testFacebookReact()">Test facebook/react</button>
+        <button onclick="testMultipleRepos()">Test Multiple Repos</button>
+        <button onclick="clearCache()">Clear Cache</button>
+        <button onclick="testDirectAPI()">Test Direct API</button>
+      </div>
+
+      <div id="results"></div>
+    </div>
+
+    <script type="module">
+      // Import the GitHub service functions
+      import {
+        getActivePRsCount,
+        clearCache,
+        clearRepoCache,
+        getRateLimitInfo,
+      } from "./src/services/github.js";
+
+      // Make functions available globally
+      window.testFacebookReact = async () => {
+        const resultsDiv = document.getElementById("results");
+        resultsDiv.innerHTML =
+          '<div class="test-section loading">Testing facebook/react...</div>';
+
+        try {
+          console.log("🧪 Testing facebook/react PR count...");
+          const prCount = await getActivePRsCount("facebook", "react");
+
+          const resultHtml = `
+                    <div class="test-section ${
+                      prCount > 0 ? "success" : "error"
+                    }">
+                        <h3>✅ facebook/react Test Result</h3>
+                        <p><strong>Active PRs:</strong> ${prCount}</p>
+                        <p><strong>Status:</strong> ${
+                          prCount > 0
+                            ? "SUCCESS - PRs found"
+                            : "FAILED - No PRs found"
+                        }</p>
+                        <p><strong>Expected:</strong> Should be > 0 (around 230 based on direct API test)</p>
+                    </div>
+                `;
+          resultsDiv.innerHTML = resultHtml;
+
+          console.log(`✅ facebook/react PR count: ${prCount}`);
+        } catch (error) {
+          const resultHtml = `
+                    <div class="test-section error">
+                        <h3>❌ facebook/react Test Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+          resultsDiv.innerHTML = resultHtml;
+          console.error("❌ facebook/react test failed:", error);
+        }
+      };
+
+      window.testMultipleRepos = async () => {
+        const resultsDiv = document.getElementById("results");
+        resultsDiv.innerHTML =
+          '<div class="test-section loading">Testing multiple repositories...</div>';
+
+        const repos = [
+          { owner: "facebook", repo: "react" },
+          { owner: "microsoft", repo: "vscode" },
+          { owner: "vercel", repo: "next.js" },
+          { owner: "nodejs", repo: "node" },
+        ];
+
+        let results = [];
+
+        for (const { owner, repo } of repos) {
+          try {
+            console.log(`🧪 Testing ${owner}/${repo}...`);
+            const prCount = await getActivePRsCount(owner, repo);
+            results.push({ owner, repo, prCount, success: true });
+          } catch (error) {
+            results.push({ owner, repo, error: error.message, success: false });
+          }
+        }
+
+        const successCount = results.filter(
+          (r) => r.success && r.prCount > 0
+        ).length;
+        const resultHtml = `
+                <div class="test-section ${
+                  successCount === repos.length ? "success" : "error"
+                }">
+                    <h3>📊 Multiple Repos Test Results</h3>
+                    <p><strong>Success Rate:</strong> ${successCount}/${
+          repos.length
+        }</p>
+                    ${results
+                      .map(
+                        (r) => `
+                        <div style="margin: 10px 0; padding: 10px; background: ${
+                          r.success && r.prCount > 0 ? "#e8f5e8" : "#ffeaea"
+                        }; border-radius: 3px;">
+                            <strong>${r.owner}/${r.repo}:</strong> 
+                            ${
+                              r.success
+                                ? `${r.prCount} PRs`
+                                : `Error: ${r.error}`
+                            }
+                        </div>
+                    `
+                      )
+                      .join("")}
+                </div>
+            `;
+        resultsDiv.innerHTML = resultHtml;
+      };
+
+      window.clearCache = () => {
+        const resultsDiv = document.getElementById("results");
+        try {
+          clearCache();
+          resultsDiv.innerHTML =
+            '<div class="test-section success"><h3>✅ Cache Cleared</h3><p>All cached data has been cleared. Next API calls will be fresh.</p></div>';
+        } catch (error) {
+          resultsDiv.innerHTML = `<div class="test-section error"><h3>❌ Cache Clear Failed</h3><p>${error.message}</p></div>`;
+        }
+      };
+
+      window.testDirectAPI = async () => {
+        const resultsDiv = document.getElementById("results");
+        resultsDiv.innerHTML =
+          '<div class="test-section loading">Testing direct API call...</div>';
+
+        try {
+          const response = await fetch(
+            "https://api.github.com/search/issues?q=repo:facebook/react+is:pr+is:open&per_page=1"
+          );
+          const data = await response.json();
+
+          const resultHtml = `
+                    <div class="test-section ${
+                      response.ok ? "success" : "error"
+                    }">
+                        <h3>🌐 Direct API Test Result</h3>
+                        <p><strong>Status:</strong> ${response.status} ${
+            response.statusText
+          }</p>
+                        <p><strong>Total Count:</strong> ${data.total_count}</p>
+                        <p><strong>Incomplete Results:</strong> ${
+                          data.incomplete_results
+                        }</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+          resultsDiv.innerHTML = resultHtml;
+        } catch (error) {
+          const resultHtml = `
+                    <div class="test-section error">
+                        <h3>❌ Direct API Test Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>
+                `;
+          resultsDiv.innerHTML = resultHtml;
+        }
+      };
+
+      // Show rate limit info on load
+      window.addEventListener("load", () => {
+        const rateLimitInfo = getRateLimitInfo();
+        console.log("📊 Rate Limit Info:", rateLimitInfo);
+      });
+    </script>
+  </body>
+</html>

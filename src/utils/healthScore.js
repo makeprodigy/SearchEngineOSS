@@ -51,7 +51,7 @@ export const calculateHealthScore = (repo) => {
         total: Math.round(Math.min(score, 100))
       });
     } catch (e) {
-      // ignore logging errors
+      console.error('HealthScore calc error:', e);
     }
   }
 
