@@ -97,6 +97,7 @@ const fetchWithRateLimit = async (url, options = {}) => {
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
   if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+    console.log(`⏳ Rate limiting: waiting ${MIN_REQUEST_INTERVAL - timeSinceLastRequest}ms`);
     await wait(MIN_REQUEST_INTERVAL - timeSinceLastRequest);
   }
   lastRequestTime = Date.now();
@@ -108,8 +109,10 @@ const fetchWithRateLimit = async (url, options = {}) => {
 
   if (GITHUB_TOKEN) {
     headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+    console.log('🔑 Using GitHub token for API request');
   } else {
     console.warn('⚠️ Making API request WITHOUT token - limited to 60 requests/hour');
+    console.warn('💡 Add VITE_GITHUB_TOKEN to .env file for higher rate limits');
   }
 
   // Create the request promise
@@ -216,13 +219,19 @@ export const searchRepositories = async (query, perPage = 30, page = 1, sort = '
   const searchQuery = query || 'stars:>1000'; // Default to popular repos
   const url = `${GITHUB_API_BASE}/search/repositories?q=${encodeURIComponent(searchQuery)}&per_page=${perPage}&page=${page}&sort=${sort}`;
   
+  console.log(`🌐 GitHub API: Searching for "${searchQuery}"`);
+  console.log(`🔗 URL: ${url}`);
+  
   try {
     const data = await fetchWithRateLimit(url);
     const results = data.items || [];
+    console.log(`✅ GitHub API: Found ${results.length} repositories for "${searchQuery}"`);
+    console.log(`📊 Total available: ${data.total_count || 0}`);
     setCache(cacheKey, results, CACHE_DURATIONS.SEARCH);
     return results;
   } catch (error) {
-    console.error('Error searching repositories:', error);
+    console.error('❌ GitHub API Error searching repositories:', error);
+    console.error('❌ URL that failed:', url);
     throw error;
   }
 };
@@ -510,6 +519,8 @@ export const getIssueHistory = (currentIssues) => {
  * @returns {Object} Repository in app format
  */
 export const transformRepository = async (githubRepo, additionalData = {}) => {
+  console.log(`🔄 Transforming ${githubRepo.full_name}...`);
+  
   // Use provided additional data or smart estimates
   // Estimate contributors from watchers/forks if not provided (rough heuristic)
   const estimatedContributors = Math.max(
@@ -560,13 +571,12 @@ export const transformRepository = async (githubRepo, additionalData = {}) => {
     commits,
     lastCommitDate: githubRepo.pushed_at,
     openIssues: githubRepo.open_issues_count,
-    activePRs, // Include PR data in health score calculation
     fullName: githubRepo.full_name,
     name: githubRepo.name,
     id: githubRepo.id
   });
 
-  return {
+  const result = {
     id: githubRepo.id.toString(),
     name: githubRepo.name,
     fullName: githubRepo.full_name,
@@ -588,6 +598,14 @@ export const transformRepository = async (githubRepo, additionalData = {}) => {
     healthScore,
     url: githubRepo.html_url,
   };
+  
+  console.log(`✅ Transformed ${githubRepo.full_name}:`, { 
+    healthScore: result.healthScore, 
+    contributors: result.contributors,
+    activePRs: result.activePRs 
+  });
+  
+  return result;
 };
 
 // Health score calculation is now imported from utils/healthScore.js
@@ -661,7 +679,10 @@ export const enrichRepository = async (githubRepo, fetchAdditionalData = true) =
  * @returns {Promise<Array>} Enriched repositories
  */
 export const batchEnrichRepositories = async (repos, fullEnrichCount = 6) => {
-  if (repos.length === 0) return [];
+  if (repos.length === 0) {
+    console.log('⚠️ batchEnrichRepositories: No repos to enrich');
+    return [];
+  }
   
   console.log(`📦 Batch enriching: ${fullEnrichCount} full, ${repos.length - fullEnrichCount} lazy`);
   
@@ -669,13 +690,22 @@ export const batchEnrichRepositories = async (repos, fullEnrichCount = 6) => {
   const reposToEnrichFully = repos.slice(0, fullEnrichCount);
   const reposToEnrichLazy = repos.slice(fullEnrichCount);
   
-  // Process in parallel
-  const [fullyEnriched, lazilyEnriched] = await Promise.all([
-    Promise.all(reposToEnrichFully.map(repo => enrichRepository(repo, true))),
-    Promise.all(reposToEnrichLazy.map(repo => enrichRepository(repo, 'lazy')))
-  ]);
+  console.log(`📊 Split: ${reposToEnrichFully.length} full, ${reposToEnrichLazy.length} lazy`);
   
-  return [...fullyEnriched, ...lazilyEnriched];
+  try {
+    // Process in parallel
+    const [fullyEnriched, lazilyEnriched] = await Promise.all([
+      Promise.all(reposToEnrichFully.map(repo => enrichRepository(repo, true))),
+      Promise.all(reposToEnrichLazy.map(repo => enrichRepository(repo, 'lazy')))
+    ]);
+    
+    console.log(`✅ Enrichment complete: ${fullyEnriched.length} full, ${lazilyEnriched.length} lazy`);
+    
+    return [...fullyEnriched, ...lazilyEnriched];
+  } catch (error) {
+    console.error('❌ batchEnrichRepositories error:', error);
+    throw error;
+  }
 };
 
 /**
@@ -746,6 +776,8 @@ export const getPopularRepos = async (limit = 6) => {
 export const searchWithFilters = async (query, filters = {}, page = 1, perPage = 30) => {
   let searchQuery = query || '';
   
+  console.log('🔍 searchWithFilters called:', { query, filters, page, perPage });
+  
   // Build GitHub search query from filters
   const queryParts = [searchQuery];
   
@@ -767,6 +799,8 @@ export const searchWithFilters = async (query, filters = {}, page = 1, perPage =
   
   const finalQuery = queryParts.filter(Boolean).join(' ') || 'stars:>1000';
   
+  console.log('🌐 Final search query:', finalQuery);
+  
   // Determine sort order
   let sort = 'stars';
   if (filters.sortBy === 'forks') sort = 'forks';
@@ -774,10 +808,14 @@ export const searchWithFilters = async (query, filters = {}, page = 1, perPage =
   else if (filters.sortBy === 'goodFirstIssues') sort = 'help-wanted-issues';
   
   try {
+    console.log('📡 Calling searchRepositories...');
     const repos = await searchRepositories(finalQuery, perPage, page, sort);
+    console.log('✅ searchRepositories returned:', { count: repos.length, firstRepo: repos[0]?.name });
     
     // Use batch enrichment to reduce API calls (fully enrich first 10, lazy enrich rest)
+    console.log('🔄 Starting batch enrichment...');
     const enriched = await batchEnrichRepositories(repos, 10);
+    console.log('✅ batchEnrichRepositories returned:', { count: enriched.length, firstRepo: enriched[0]?.name });
     
     // Apply additional client-side filters that GitHub doesn't support
     let filtered = enriched;

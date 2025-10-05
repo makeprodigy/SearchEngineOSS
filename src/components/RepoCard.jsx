@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Star, GitFork, Users, AlertCircle, GitPullRequest, Code, BookmarkPlus, Bookmark, ExternalLink, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 import { LineChart, Line, Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { getHealthScoreColor, getHealthScoreBgColor, getHealthScoreLabel } from '../utils/healthScore';
+import { getHealthScoreColor, getHealthScoreBgColor } from '../utils/healthScore';
 import { useAuth } from '../contexts/AuthContext';
 import { saveRepo, unsaveRepo } from '../services/firebase';
 
@@ -143,9 +143,6 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
             Health Score: {repo.healthScore}
           </span>
         </div>
-        <span className={`text-xs font-medium ${getHealthScoreColor(repo.healthScore)}`}>
-          {getHealthScoreLabel(repo.healthScore)}
-        </span>
       </div>
 
       {/* Stats Grid */}

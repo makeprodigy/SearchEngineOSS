@@ -117,6 +117,70 @@ const FilterSidebar = ({ filters, onFilterChange, languages, licenses, topics })
           </select>
         </div>
 
+        {/* Good First Issues - Moved to top */}
+        <FilterSection title="Beginner Friendly" section="goodFirstIssues">
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={filters.hasGoodFirstIssues || false}
+                onChange={(e) => onFilterChange({ 
+                  ...filters, 
+                  hasGoodFirstIssues: e.target.checked || undefined 
+                })}
+                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                Has good first issues
+              </span>
+            </label>
+            <div>
+              <label className="text-xs text-gray-600 dark:text-gray-400 mb-1.5 block font-medium">
+                Minimum Good First Issues
+              </label>
+              <input
+                type="number"
+                value={filters.minGoodFirstIssues || ''}
+                onChange={(e) => onFilterChange({ 
+                  ...filters, 
+                  minGoodFirstIssues: e.target.value ? parseInt(e.target.value) : undefined 
+                })}
+                placeholder="e.g., 5"
+                className="input-field text-sm"
+              />
+            </div>
+          </div>
+        </FilterSection>
+
+        {/* Health Score Filter - Moved below Beginner Friendly */}
+        <FilterSection title="Health Score" section="health">
+          <div className="space-y-2">
+            {[
+              { label: 'Excellent', range: '90+', value: 90, dotColor: 'bg-green-500', textColor: 'text-green-600 dark:text-green-400' },
+              { label: 'Good', range: '75+', value: 75, dotColor: 'bg-blue-500', textColor: 'text-blue-600 dark:text-blue-400' },
+              { label: 'Fair', range: '60+', value: 60, dotColor: 'bg-yellow-500', textColor: 'text-yellow-600 dark:text-yellow-400' }
+            ].map((option) => (
+              <button
+                key={option.value}
+                onClick={() => onFilterChange({ ...filters, minHealthScore: option.value })}
+                className={`w-full text-left text-sm px-3 py-2.5 rounded-lg font-medium transition-all duration-200 flex items-center justify-between ${
+                  filters.minHealthScore === option.value
+                    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 shadow-sm ring-2 ring-primary-500/20'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:shadow-sm'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${option.dotColor} flex-shrink-0`}></span>
+                  {option.label}
+                </span>
+                <span className={`text-xs font-semibold ${filters.minHealthScore === option.value ? '' : option.textColor}`}>
+                  {option.range}
+                </span>
+              </button>
+            ))}
+          </div>
+        </FilterSection>
+
         {/* Language Filter */}
         <FilterSection title="Language" section="language">
           <div className="space-y-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
@@ -200,69 +264,7 @@ const FilterSidebar = ({ filters, onFilterChange, languages, licenses, topics })
           </div>
         </FilterSection>
 
-        {/* Health Score Filter */}
-        <FilterSection title="Health Score" section="health">
-          <div className="space-y-2">
-            {[
-              { label: 'Excellent', range: '90+', value: 90, dotColor: 'bg-green-500', textColor: 'text-green-600 dark:text-green-400' },
-              { label: 'Good', range: '75+', value: 75, dotColor: 'bg-blue-500', textColor: 'text-blue-600 dark:text-blue-400' },
-              { label: 'Fair', range: '60+', value: 60, dotColor: 'bg-yellow-500', textColor: 'text-yellow-600 dark:text-yellow-400' }
-            ].map((option) => (
-              <button
-                key={option.value}
-                onClick={() => onFilterChange({ ...filters, minHealthScore: option.value })}
-                className={`w-full text-left text-sm px-3 py-2.5 rounded-lg font-medium transition-all duration-200 flex items-center justify-between ${
-                  filters.minHealthScore === option.value
-                    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 shadow-sm ring-2 ring-primary-500/20'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:shadow-sm'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${option.dotColor} flex-shrink-0`}></span>
-                  {option.label}
-                </span>
-                <span className={`text-xs font-semibold ${filters.minHealthScore === option.value ? '' : option.textColor}`}>
-                  {option.range}
-                </span>
-              </button>
-            ))}
-          </div>
-        </FilterSection>
 
-        {/* Good First Issues */}
-        <FilterSection title="Beginner Friendly" section="goodFirstIssues">
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={filters.hasGoodFirstIssues || false}
-                onChange={(e) => onFilterChange({ 
-                  ...filters, 
-                  hasGoodFirstIssues: e.target.checked || undefined 
-                })}
-                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                Has good first issues
-              </span>
-            </label>
-            <div>
-              <label className="text-xs text-gray-600 dark:text-gray-400 mb-1.5 block font-medium">
-                Minimum Good First Issues
-              </label>
-              <input
-                type="number"
-                value={filters.minGoodFirstIssues || ''}
-                onChange={(e) => onFilterChange({ 
-                  ...filters, 
-                  minGoodFirstIssues: e.target.value ? parseInt(e.target.value) : undefined 
-                })}
-                placeholder="e.g., 5"
-                className="input-field text-sm"
-              />
-            </div>
-          </div>
-        </FilterSection>
       </div>
 
       {/* Fade effect at bottom */}

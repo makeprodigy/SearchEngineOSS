@@ -32,19 +32,6 @@ const SearchPage = () => {
   const [languages, setLanguages] = useState(['JavaScript', 'Python', 'TypeScript', 'Go', 'Rust', 'Java', 'C++', 'Ruby', 'PHP', 'Swift']);
   const [licenses, setLicenses] = useState(['MIT', 'Apache-2.0', 'GPL-3.0', 'BSD-3-Clause', 'ISC', 'LGPL-3.0']);
 
-  // Initial load: Fetch top repositories by health score
-  useEffect(() => {
-    if (initialLoad && !query && Object.keys(filters).length === 0) {
-      // Load top repositories sorted by stars (which contributes to health score)
-      const initialFilters = {
-        sortBy: 'stars',
-        minStars: 1000 // Get repos with at least 1000 stars
-      };
-      performSearch('', initialFilters, 1, false);
-      setInitialLoad(false);
-    }
-  }, []);
-
   // Sync query with URL params
   useEffect(() => {
     const q = searchParams.get('q') || '';
@@ -54,26 +41,35 @@ const SearchPage = () => {
     }
   }, [searchParams]);
 
-  // Perform search when debounced values change (but only if there's a query or filters)
+  // Main search effect - handles both initial load and user searches
   useEffect(() => {
-    // Skip if this is initial load (handled by separate effect)
-    if (initialLoad) return;
-    
     // Reset to page 1 when query or filters change
     setCurrentPage(1);
     
-    // Only search if we have a query or if user has applied filters
-    if (debouncedQuery.trim() || Object.keys(debouncedFilters).length > 0) {
+    // Determine what to search for
+    if (debouncedQuery.trim()) {
+      // User has entered a search query
+      console.log('🔍 SearchPage: Triggering user search with:', { debouncedQuery, debouncedFilters });
       performSearch(debouncedQuery, debouncedFilters, 1, false);
-    } else if (hasSearched) {
-      // If query and filters are cleared, reload top repositories
+    } else if (initialLoad && !debouncedQuery.trim()) {
+      // Initial load with no query - show top repos
+      const initialFilters = {
+        sortBy: 'stars',
+        minStars: 1000 // Get repos with at least 1000 stars
+      };
+      console.log('🔄 SearchPage: Initial load - showing top repos');
+      performSearch('', initialFilters, 1, false);
+      setInitialLoad(false);
+    } else if (hasSearched && !debouncedQuery.trim() && Object.keys(debouncedFilters).length === 0) {
+      // User cleared search - reload top repos
       const initialFilters = {
         sortBy: 'stars',
         minStars: 1000
       };
+      console.log('🔄 SearchPage: Reloading top repos after search cleared');
       performSearch('', initialFilters, 1, false);
     }
-  }, [debouncedQuery, debouncedFilters, resultsPerPage]);
+  }, [debouncedQuery, debouncedFilters, resultsPerPage, initialLoad]);
 
   const performSearch = async (searchQuery, searchFilters, page = 1, append = false) => {
     // Allow search with empty query if filters are present (for initial load and filtered searches)
@@ -83,6 +79,14 @@ const SearchPage = () => {
     //   setLoadingMore(false);
     //   return;
     // }
+
+    console.log('🔍 performSearch called:', { searchQuery, searchFilters, page, append });
+    console.log('🔍 Current state before search:', { 
+      loading, 
+      results: results.length, 
+      hasSearched, 
+      error 
+    });
 
     if (append) {
       setLoadingMore(true);
@@ -94,6 +98,7 @@ const SearchPage = () => {
     setHasSearched(true);
 
     try {
+      console.log('🌐 Calling searchWithFilters...');
       // Use GitHub API for real-time data
       const { results: searchResults, hasMore: moreAvailable } = await searchWithFilters(
         searchQuery, 
@@ -102,27 +107,56 @@ const SearchPage = () => {
         resultsPerPage
       );
       
+      console.log('✅ searchWithFilters returned:', { 
+        resultsCount: searchResults.length, 
+        hasMore: moreAvailable,
+        firstResult: searchResults[0] ? searchResults[0].name : null
+      });
+      
       // Sort by health score for initial load and when no specific query
       let sortedResults = searchResults;
       if (!searchQuery.trim() && !searchFilters.sortBy) {
         sortedResults = [...searchResults].sort((a, b) => b.healthScore - a.healthScore);
       }
       
+      console.log('📊 Final results:', { 
+        count: sortedResults.length,
+        firstResult: sortedResults[0] ? sortedResults[0].name : null
+      });
+      
       if (append) {
         // Append to existing results
-        setResults(prev => [...prev, ...sortedResults]);
+        setResults(prev => {
+          const newResults = [...prev, ...sortedResults];
+          console.log('📊 Appending results:', { 
+            prevCount: prev.length, 
+            newCount: sortedResults.length, 
+            totalCount: newResults.length 
+          });
+          return newResults;
+        });
       } else {
         // Replace results
+        console.log('📊 Setting new results:', { 
+          count: sortedResults.length,
+          firstResult: sortedResults[0]?.name || 'none'
+        });
         setResults(sortedResults);
       }
       
       setHasMore(moreAvailable);
+      console.log('✅ Search completed successfully:', { 
+        resultsCount: sortedResults.length, 
+        hasMore: moreAvailable 
+      });
     } catch (err) {
-      console.error('Search error:', err);
+      console.error('❌ Search error:', err);
       
       // Enhanced error message for rate limiting
       if (err.message.includes('rate limit')) {
-        setError(err.message);
+        setError(`GitHub API rate limit exceeded. ${err.message}`);
+      } else if (err.message.includes('Failed to fetch')) {
+        setError('Network error: Unable to connect to GitHub. Please check your internet connection.');
       } else {
         setError(err.message || 'Failed to fetch repositories. Please try again.');
       }
@@ -130,6 +164,9 @@ const SearchPage = () => {
       if (!append) {
         setResults([]);
       }
+      
+      // Set hasSearched to true even on error so we show the error state
+      setHasSearched(true);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -205,6 +242,16 @@ const SearchPage = () => {
           {/* Results */}
           <main className="flex-1">
             <div className="mb-6">
+              {/* Debug Info */}
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm">
+                <p className="text-blue-700 dark:text-blue-300">
+                  🔍 Debug: loading={loading.toString()}, error={error || 'none'}, hasSearched={hasSearched.toString()}, results={results.length}
+                </p>
+                <p className="text-blue-600 dark:text-blue-400 mt-1">
+                  Query: "{query}", Debounced: "{debouncedQuery}"
+                </p>
+              </div>
+              
               <div className="flex items-center justify-between mb-2 gap-4">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {query ? `Search results for "${query}"` : 'Top Repositories'}
@@ -232,6 +279,19 @@ const SearchPage = () => {
                       per page
                     </span>
                   </div>
+                  
+                  {/* Test Search Button */}
+                  <button
+                    onClick={() => {
+                      console.log('🧪 Manual test search triggered');
+                      performSearch('react', {}, 1, false);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-100 dark:bg-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-600 rounded-lg transition-colors duration-200"
+                    title="Test search with 'react'"
+                  >
+                    <span>🧪</span>
+                    <span className="hidden sm:inline">Test Search</span>
+                  </button>
                   
                   {/* Cache Clear Button */}
                   <button
@@ -297,12 +357,6 @@ const SearchPage = () => {
                           Clear Cache & Retry
                         </button>
                       )}
-                      <button
-                        onClick={() => setUseGitHubAPI(false)}
-                        className="text-sm px-3 py-1.5 border border-red-600 dark:border-red-700 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                      >
-                        Use Mock Data
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -327,6 +381,11 @@ const SearchPage = () => {
             {/* Results Grid */}
             {!loading && !error && hasSearched && results.length > 0 && (
               <>
+                <div className="mb-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    🎉 Found {results.length} repositories to display
+                  </p>
+                </div>
                 <RepoGrid 
                   repos={results}
                   savedRepos={userData?.savedRepos || []}
