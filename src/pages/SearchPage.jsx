@@ -52,18 +52,18 @@ const SearchPage = () => {
       console.log('🔍 SearchPage: Triggering user search with:', { debouncedQuery, debouncedFilters });
       performSearch(debouncedQuery, debouncedFilters, 1, false);
     } else if (initialLoad && !debouncedQuery.trim()) {
-      // Initial load with no query - show top repos
+      // Initial load with no query - show top repos sorted by health score
       const initialFilters = {
-        sortBy: 'stars',
+        sortBy: 'healthScore',
         minStars: 1000 // Get repos with at least 1000 stars
       };
-      console.log('🔄 SearchPage: Initial load - showing top repos');
+      console.log('🔄 SearchPage: Initial load - showing top repos sorted by health score');
       performSearch('', initialFilters, 1, false);
       setInitialLoad(false);
     } else if (hasSearched && !debouncedQuery.trim() && Object.keys(debouncedFilters).length === 0) {
-      // User cleared search - reload top repos
+      // User cleared search - reload top repos sorted by health score
       const initialFilters = {
-        sortBy: 'stars',
+        sortBy: 'healthScore',
         minStars: 1000
       };
       console.log('🔄 SearchPage: Reloading top repos after search cleared');
@@ -242,16 +242,6 @@ const SearchPage = () => {
           {/* Results */}
           <main className="flex-1">
             <div className="mb-6">
-              {/* Debug Info */}
-              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm">
-                <p className="text-blue-700 dark:text-blue-300">
-                  🔍 Debug: loading={loading.toString()}, error={error || 'none'}, hasSearched={hasSearched.toString()}, results={results.length}
-                </p>
-                <p className="text-blue-600 dark:text-blue-400 mt-1">
-                  Query: "{query}", Debounced: "{debouncedQuery}"
-                </p>
-              </div>
-              
               <div className="flex items-center justify-between mb-2 gap-4">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {query ? `Search results for "${query}"` : 'Top Repositories'}
@@ -279,19 +269,6 @@ const SearchPage = () => {
                       per page
                     </span>
                   </div>
-                  
-                  {/* Test Search Button */}
-                  <button
-                    onClick={() => {
-                      console.log('🧪 Manual test search triggered');
-                      performSearch('react', {}, 1, false);
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-100 dark:bg-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-600 rounded-lg transition-colors duration-200"
-                    title="Test search with 'react'"
-                  >
-                    <span>🧪</span>
-                    <span className="hidden sm:inline">Test Search</span>
-                  </button>
                   
                   {/* Cache Clear Button */}
                   <button
@@ -381,11 +358,6 @@ const SearchPage = () => {
             {/* Results Grid */}
             {!loading && !error && hasSearched && results.length > 0 && (
               <>
-                <div className="mb-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    🎉 Found {results.length} repositories to display
-                  </p>
-                </div>
                 <RepoGrid 
                   repos={results}
                   savedRepos={userData?.savedRepos || []}
