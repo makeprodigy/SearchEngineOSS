@@ -33,13 +33,31 @@ const POPULAR_LANGUAGES = [
   'PHP', 'Ruby', 'Swift', 'Kotlin', 'Dart', 'Scala', 'R', 'MATLAB'
 ];
 
-// Popular topics/technologies
+// Popular topics/technologies with enhanced coverage
 const POPULAR_TOPICS = [
+  // Core technologies
   'machine-learning', 'web-framework', 'mobile-app', 'database', 'api',
   'frontend', 'backend', 'devops', 'blockchain', 'ai', 'react', 'vue',
   'angular', 'nodejs', 'python', 'javascript', 'typescript', 'docker',
   'kubernetes', 'aws', 'azure', 'gcp', 'microservices', 'rest-api',
-  'graphql', 'mongodb', 'postgresql', 'redis', 'elasticsearch'
+  'graphql', 'mongodb', 'postgresql', 'redis', 'elasticsearch',
+  
+  // Additional popular topics
+  'web-app', 'desktop-app', 'cli', 'library', 'framework', 'tool',
+  'plugin', 'extension', 'theme', 'template', 'starter', 'boilerplate',
+  'education', 'learning', 'tutorial', 'example', 'demo', 'showcase',
+  'game', 'gaming', 'engine', 'simulation', 'visualization', 'chart',
+  'ui', 'ux', 'design', 'css', 'html', 'scss', 'sass', 'less',
+  'testing', 'unit-test', 'integration-test', 'e2e', 'automation',
+  'ci', 'cd', 'pipeline', 'deployment', 'monitoring', 'logging',
+  'security', 'cryptography', 'encryption', 'authentication', 'authorization',
+  'performance', 'optimization', 'cache', 'cdn', 'pwa', 'spa',
+  'ssr', 'ssg', 'jamstack', 'serverless', 'edge', 'cloud',
+  'iot', 'hardware', 'arduino', 'raspberry-pi', 'embedded', 'firmware',
+  'mobile', 'ios', 'android', 'flutter', 'react-native', 'xamarin',
+  'data-science', 'analytics', 'visualization', 'dashboard', 'reporting',
+  'nlp', 'computer-vision', 'deep-learning', 'neural-network', 'tensorflow',
+  'pytorch', 'scikit-learn', 'opencv', 'pandas', 'numpy', 'matplotlib'
 ];
 
 // Popular GitHub users/organizations
@@ -79,15 +97,20 @@ export const getSearchSuggestions = async (query, limit = 8) => {
       description: 'Programming Language'
     }));
 
-  // Topic suggestions
+  // Topic suggestions with enhanced matching
   const topicMatches = POPULAR_TOPICS
-    .filter(topic => topic.toLowerCase().includes(normalizedQuery))
-    .slice(0, 2)
+    .filter(topic => {
+      const topicLower = topic.toLowerCase();
+      return topicLower.includes(normalizedQuery) || 
+             topicLower.split('-').some(part => part.startsWith(normalizedQuery)) ||
+             topicLower.split(' ').some(part => part.startsWith(normalizedQuery));
+    })
+    .slice(0, 3)
     .map(topic => ({
-      text: topic,
+      text: `topic:${topic}`,
       type: SUGGESTION_TYPES.TOPIC,
       icon: Tag,
-      description: 'Topic'
+      description: 'Search in topics'
     }));
 
   // User suggestions
@@ -136,4 +159,76 @@ export const saveRecentSearch = (query) => {
   } catch {
     // Ignore localStorage errors
   }
+};
+
+/**
+ * Get topic-based search suggestions
+ * @param {string} query - Search query
+ * @param {number} limit - Maximum number of suggestions
+ * @returns {Array} Array of topic suggestions
+ */
+export const getTopicSuggestions = (query, limit = 5) => {
+  if (!query || query.trim().length < 2) {
+    return [];
+  }
+
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  return POPULAR_TOPICS
+    .filter(topic => {
+      const topicLower = topic.toLowerCase();
+      return topicLower.includes(normalizedQuery) || 
+             topicLower.split('-').some(part => part.startsWith(normalizedQuery)) ||
+             topicLower.split(' ').some(part => part.startsWith(normalizedQuery));
+    })
+    .slice(0, limit)
+    .map(topic => ({
+      text: topic,
+      type: SUGGESTION_TYPES.TOPIC,
+      icon: Tag,
+      description: 'Topic'
+    }));
+};
+
+/**
+ * Parse search query to extract topics and other qualifiers
+ * @param {string} query - Search query
+ * @returns {Object} Parsed query with topics and base query
+ */
+export const parseSearchQuery = (query) => {
+  if (!query || !query.trim()) {
+    return { baseQuery: '', topics: [], qualifiers: {} };
+  }
+
+  const topics = [];
+  const qualifiers = {};
+  let baseQuery = query.trim();
+
+  // Extract topic: qualifiers
+  const topicRegex = /topic:([^\s]+)/g;
+  let match;
+  while ((match = topicRegex.exec(query)) !== null) {
+    topics.push(match[1].replace(/['"]/g, ''));
+  }
+  
+  // Extract other qualifiers
+  const languageRegex = /language:([^\s]+)/g;
+  while ((match = languageRegex.exec(query)) !== null) {
+    qualifiers.language = match[1];
+  }
+
+  const userRegex = /user:([^\s]+)/g;
+  while ((match = userRegex.exec(query)) !== null) {
+    qualifiers.user = match[1];
+  }
+
+  // Remove qualifiers from base query
+  baseQuery = baseQuery
+    .replace(topicRegex, '')
+    .replace(languageRegex, '')
+    .replace(userRegex, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return { baseQuery, topics, qualifiers };
 };

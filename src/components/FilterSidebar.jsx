@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 
-const FilterSidebar = ({ filters, onFilterChange, languages, licenses, topics }) => {
+const FilterSidebar = ({ filters = {}, onFilterChange, languages = [], licenses = [], topics = [] }) => {
   const [expandedSections, setExpandedSections] = useState({
     language: true,
     license: true,
+    topics: true,
     stars: true,
     health: true,
     goodFirstIssues: true
@@ -21,6 +22,7 @@ const FilterSidebar = ({ filters, onFilterChange, languages, licenses, topics })
     const newLanguages = filters.languages?.includes(language)
       ? filters.languages.filter(l => l !== language)
       : [...(filters.languages || []), language];
+    console.log('🔧 Language toggle:', { language, newLanguages });
     onFilterChange({ ...filters, languages: newLanguages });
   };
 
@@ -28,18 +30,30 @@ const FilterSidebar = ({ filters, onFilterChange, languages, licenses, topics })
     const newLicenses = filters.licenses?.includes(license)
       ? filters.licenses.filter(l => l !== license)
       : [...(filters.licenses || []), license];
+    console.log('🔧 License toggle:', { license, newLicenses });
     onFilterChange({ ...filters, licenses: newLicenses });
   };
 
+  const handleTopicToggle = (topic) => {
+    const newTopics = filters.topics?.includes(topic)
+      ? filters.topics.filter(t => t !== topic)
+      : [...(filters.topics || []), topic];
+    console.log('🔧 Topic toggle:', { topic, newTopics });
+    onFilterChange({ ...filters, topics: newTopics });
+  };
+
   const handleClearAll = () => {
+    console.log('🧹 Clearing all filters');
     onFilterChange({});
   };
 
   const hasActiveFilters = () => {
     return (filters.languages?.length > 0) ||
            (filters.licenses?.length > 0) ||
+           (filters.topics?.length > 0) ||
            filters.minStars ||
            filters.minHealthScore ||
+           filters.minGoodFirstIssues ||
            filters.hasGoodFirstIssues ||
            filters.sortBy;
   };
@@ -50,15 +64,16 @@ const FilterSidebar = ({ filters, onFilterChange, languages, licenses, topics })
         onClick={() => toggleSection(section)}
         className="w-full flex items-center justify-between text-left font-semibold text-gray-900 dark:text-white mb-3 hover:text-primary-600 dark:hover:text-primary-400 transition-colors duration-200 group"
       >
-        <span className="flex items-center gap-2">
-          {title}
-          {expandedSections[section] && (
-            <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
-              {section === 'language' && filters.languages?.length > 0 && `(${filters.languages.length})`}
-              {section === 'license' && filters.licenses?.length > 0 && `(${filters.licenses.length})`}
+            <span className="flex items-center gap-2">
+              {title}
+              {expandedSections[section] && (
+                <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
+                  {section === 'language' && filters.languages?.length > 0 && `(${filters.languages.length})`}
+                  {section === 'license' && filters.licenses?.length > 0 && `(${filters.licenses.length})`}
+                  {section === 'topics' && filters.topics?.length > 0 && `(${filters.topics.length})`}
+                </span>
+              )}
             </span>
-          )}
-        </span>
         <span className="text-gray-400 dark:text-gray-500 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
           {expandedSections[section] ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </span>
@@ -124,10 +139,14 @@ const FilterSidebar = ({ filters, onFilterChange, languages, licenses, topics })
               <input
                 type="checkbox"
                 checked={filters.hasGoodFirstIssues || false}
-                onChange={(e) => onFilterChange({ 
-                  ...filters, 
-                  hasGoodFirstIssues: e.target.checked || undefined 
-                })}
+                onChange={(e) => {
+                  const newValue = e.target.checked || undefined;
+                  console.log('🔧 Good first issues toggle:', { checked: e.target.checked, newValue });
+                  onFilterChange({ 
+                    ...filters, 
+                    hasGoodFirstIssues: newValue 
+                  });
+                }}
                 className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
               />
               <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
@@ -162,7 +181,10 @@ const FilterSidebar = ({ filters, onFilterChange, languages, licenses, topics })
             ].map((option) => (
               <button
                 key={option.value}
-                onClick={() => onFilterChange({ ...filters, minHealthScore: option.value })}
+                onClick={() => {
+                  console.log('🔧 Health score filter:', { value: option.value, label: option.label });
+                  onFilterChange({ ...filters, minHealthScore: option.value });
+                }}
                 className={`w-full text-left text-sm px-3 py-2.5 rounded-lg font-medium transition-all duration-200 flex items-center justify-between ${
                   filters.minHealthScore === option.value
                     ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 shadow-sm ring-2 ring-primary-500/20'
@@ -219,6 +241,28 @@ const FilterSidebar = ({ filters, onFilterChange, languages, licenses, topics })
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
                   {license}
+                </span>
+              </label>
+            ))}
+          </div>
+        </FilterSection>
+
+        {/* Topics Filter */}
+        <FilterSection title="Topics" section="topics">
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
+            {topics.slice(0, 15).map((topic) => (
+              <label 
+                key={topic} 
+                className="flex items-center gap-2 cursor-pointer group hover:bg-gray-50 dark:hover:bg-gray-700/50 p-2 -m-2 rounded-md transition-colors duration-150"
+              >
+                <input
+                  type="checkbox"
+                  checked={filters.topics?.includes(topic) || false}
+                  onChange={() => handleTopicToggle(topic)}
+                  className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500 cursor-pointer transition-colors"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                  {topic}
                 </span>
               </label>
             ))}

@@ -201,25 +201,60 @@ export const getRateLimitInfo = () => ({
 });
 
 /**
- * Search repositories on GitHub
+ * Enhanced search query builder that includes topics, descriptions, and metadata
+ * @param {string} query - Base search query
+ * @param {Array} topics - Array of topics to search for
+ * @returns {string} Enhanced GitHub search query
+ */
+const buildEnhancedSearchQuery = (query, topics = []) => {
+  let searchParts = [];
+  
+  // Add the base query if it exists
+  if (query && query.trim()) {
+    const trimmedQuery = query.trim();
+    
+    // Check if the query already contains GitHub qualifiers
+    const hasQualifiers = /(in:|language:|topic:|user:|org:|stars:|forks:|created:|updated:|license:|archived:|is:)/.test(trimmedQuery);
+    
+    if (hasQualifiers) {
+      // User is using advanced GitHub search syntax
+      searchParts.push(trimmedQuery);
+    } else {
+      // Enhance basic query to search in name, description, and topics
+      searchParts.push(`"${trimmedQuery}" in:name,description`);
+    }
+  }
+  
+  // Add topic searches
+  if (topics && topics.length > 0) {
+    const topicQueries = topics.map(topic => `topic:"${topic}"`);
+    searchParts.push(topicQueries.join(' '));
+  }
+  
+  return searchParts.length > 0 ? searchParts.join(' ') : 'stars:>1000';
+};
+
+/**
+ * Search repositories on GitHub with enhanced query building
  * @param {string} query - Search query
  * @param {number} perPage - Results per page (max 100)
  * @param {number} page - Page number
  * @param {string} sort - Sort field (stars, forks, help-wanted-issues, updated)
+ * @param {Array} topics - Array of topics to include in search
  * @returns {Promise<Array>} Array of repositories
  */
-export const searchRepositories = async (query, perPage = 30, page = 1, sort = 'stars') => {
-  const cacheKey = `search:${query}:${perPage}:${page}:${sort}`;
+export const searchRepositories = async (query, perPage = 30, page = 1, sort = 'stars', topics = []) => {
+  const cacheKey = `search:${query}:${topics.join(',')}:${perPage}:${page}:${sort}`;
   const cached = getCached(cacheKey, CACHE_DURATIONS.SEARCH);
   if (cached) {
-    console.log(`✅ Cache hit for search: ${query}`);
+    console.log(`✅ Cache hit for search: ${query} with topics: ${topics.join(',')}`);
     return cached;
   }
 
-  const searchQuery = query || 'stars:>1000'; // Default to popular repos
+  const searchQuery = buildEnhancedSearchQuery(query, topics);
   const url = `${GITHUB_API_BASE}/search/repositories?q=${encodeURIComponent(searchQuery)}&per_page=${perPage}&page=${page}&sort=${sort}`;
   
-  console.log(`🌐 GitHub API: Searching for "${searchQuery}"`);
+  console.log(`🌐 GitHub API: Enhanced search for "${searchQuery}"`);
   console.log(`🔗 URL: ${url}`);
   
   try {
@@ -797,6 +832,11 @@ export const searchWithFilters = async (query, filters = {}, page = 1, perPage =
     queryParts.push(filters.licenses.map(license => `license:${license.toLowerCase()}`).join(' '));
   }
   
+  // Add topic filters to the search
+  if (filters.topics && filters.topics.length > 0) {
+    queryParts.push(filters.topics.map(topic => `topic:"${topic}"`).join(' '));
+  }
+  
   const finalQuery = queryParts.filter(Boolean).join(' ') || 'stars:>1000';
   
   console.log('🌐 Final search query:', finalQuery);
@@ -809,7 +849,8 @@ export const searchWithFilters = async (query, filters = {}, page = 1, perPage =
   
   try {
     console.log('📡 Calling searchRepositories...');
-    const repos = await searchRepositories(finalQuery, perPage, page, sort);
+    // Pass topics to searchRepositories for enhanced search
+    const repos = await searchRepositories(finalQuery, perPage, page, sort, filters.topics || []);
     console.log('✅ searchRepositories returned:', { count: repos.length, firstRepo: repos[0]?.name });
     
     // Use batch enrichment to reduce API calls (fully enrich first 10, lazy enrich rest)

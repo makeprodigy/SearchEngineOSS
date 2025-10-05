@@ -28,16 +28,88 @@ const SearchPage = () => {
   const debouncedQuery = useDebounce(query, 800); // Increased debounce time
   const debouncedFilters = useDebounce(filters, 800);
 
-  // Available languages and licenses for filters
+  // Available languages, licenses, and topics for filters
   const [languages, setLanguages] = useState(['JavaScript', 'Python', 'TypeScript', 'Go', 'Rust', 'Java', 'C++', 'Ruby', 'PHP', 'Swift']);
   const [licenses, setLicenses] = useState(['MIT', 'Apache-2.0', 'GPL-3.0', 'BSD-3-Clause', 'ISC', 'LGPL-3.0']);
+  const [topics, setTopics] = useState([
+    'machine-learning', 'web-framework', 'mobile-app', 'database', 'api',
+    'frontend', 'backend', 'devops', 'blockchain', 'ai', 'react', 'vue',
+    'angular', 'nodejs', 'python', 'javascript', 'typescript', 'docker',
+    'kubernetes', 'aws', 'azure', 'gcp', 'microservices', 'rest-api',
+    'graphql', 'mongodb', 'postgresql', 'redis', 'elasticsearch',
+    'web-app', 'desktop-app', 'cli', 'library', 'framework', 'tool',
+    'plugin', 'extension', 'theme', 'template', 'starter', 'boilerplate',
+    'education', 'learning', 'tutorial', 'example', 'demo', 'showcase',
+    'game', 'gaming', 'engine', 'simulation', 'visualization', 'chart',
+    'ui', 'ux', 'design', 'css', 'html', 'scss', 'sass', 'less',
+    'testing', 'unit-test', 'integration-test', 'e2e', 'automation',
+    'ci', 'cd', 'pipeline', 'deployment', 'monitoring', 'logging',
+    'security', 'cryptography', 'encryption', 'authentication', 'authorization',
+    'performance', 'optimization', 'cache', 'cdn', 'pwa', 'spa',
+    'ssr', 'ssg', 'jamstack', 'serverless', 'edge', 'cloud',
+    'iot', 'hardware', 'arduino', 'raspberry-pi', 'embedded', 'firmware',
+    'mobile', 'ios', 'android', 'flutter', 'react-native', 'xamarin',
+    'data-science', 'analytics', 'visualization', 'dashboard', 'reporting',
+    'nlp', 'computer-vision', 'deep-learning', 'neural-network', 'tensorflow',
+    'pytorch', 'scikit-learn', 'opencv', 'pandas', 'numpy', 'matplotlib'
+  ]);
 
-  // Sync query with URL params
+  // Sync query and filters with URL params
   useEffect(() => {
     const q = searchParams.get('q') || '';
+    const urlFilters = {};
+    
+    // Load filters from URL parameters
+    const languagesParam = searchParams.get('languages');
+    if (languagesParam) {
+      urlFilters.languages = languagesParam.split(',');
+    }
+    
+    const licensesParam = searchParams.get('licenses');
+    if (licensesParam) {
+      urlFilters.licenses = licensesParam.split(',');
+    }
+    
+    const topicsParam = searchParams.get('topics');
+    if (topicsParam) {
+      urlFilters.topics = topicsParam.split(',');
+    }
+    
+    const minStarsParam = searchParams.get('minStars');
+    if (minStarsParam) {
+      urlFilters.minStars = parseInt(minStarsParam, 10);
+    }
+    
+    const minHealthScoreParam = searchParams.get('minHealthScore');
+    if (minHealthScoreParam) {
+      urlFilters.minHealthScore = parseInt(minHealthScoreParam, 10);
+    }
+    
+    const minGoodFirstIssuesParam = searchParams.get('minGoodFirstIssues');
+    if (minGoodFirstIssuesParam) {
+      urlFilters.minGoodFirstIssues = parseInt(minGoodFirstIssuesParam, 10);
+    }
+    
+    const hasGoodFirstIssuesParam = searchParams.get('hasGoodFirstIssues');
+    if (hasGoodFirstIssuesParam === 'true') {
+      urlFilters.hasGoodFirstIssues = true;
+    }
+    
+    const sortByParam = searchParams.get('sortBy');
+    if (sortByParam) {
+      urlFilters.sortBy = sortByParam;
+    }
+    
+    // Update query if changed
     if (q !== query) {
       setQuery(q);
       setInitialLoad(false);
+    }
+    
+    // Update filters if changed
+    if (JSON.stringify(urlFilters) !== JSON.stringify(filters)) {
+      console.log('🔄 Loading filters from URL:', urlFilters);
+      setFilters(urlFilters);
     }
   }, [searchParams]);
 
@@ -45,6 +117,14 @@ const SearchPage = () => {
   useEffect(() => {
     // Reset to page 1 when query or filters change
     setCurrentPage(1);
+    
+    console.log('🔍 Search effect triggered:', { 
+      debouncedQuery, 
+      debouncedFilters, 
+      initialLoad, 
+      hasSearched,
+      resultsPerPage 
+    });
     
     // Determine what to search for
     if (debouncedQuery.trim()) {
@@ -68,6 +148,10 @@ const SearchPage = () => {
       };
       console.log('🔄 SearchPage: Reloading top repos after search cleared');
       performSearch('', initialFilters, 1, false);
+    } else if (Object.keys(debouncedFilters).length > 0 && !debouncedQuery.trim()) {
+      // User has applied filters but no search query
+      console.log('🔍 SearchPage: Filter-only search:', { debouncedFilters });
+      performSearch('', debouncedFilters, 1, false);
     }
   }, [debouncedQuery, debouncedFilters, resultsPerPage, initialLoad]);
 
@@ -189,7 +273,42 @@ const SearchPage = () => {
   };
 
   const handleFilterChange = (newFilters) => {
+    console.log('🔧 Filter change:', { oldFilters: filters, newFilters });
     setFilters(newFilters);
+    
+    // Update URL parameters to persist filters
+    const params = new URLSearchParams();
+    if (query.trim()) {
+      params.set('q', query);
+    }
+    
+    // Add filter parameters to URL
+    if (newFilters.languages?.length > 0) {
+      params.set('languages', newFilters.languages.join(','));
+    }
+    if (newFilters.licenses?.length > 0) {
+      params.set('licenses', newFilters.licenses.join(','));
+    }
+    if (newFilters.topics?.length > 0) {
+      params.set('topics', newFilters.topics.join(','));
+    }
+    if (newFilters.minStars) {
+      params.set('minStars', newFilters.minStars.toString());
+    }
+    if (newFilters.minHealthScore) {
+      params.set('minHealthScore', newFilters.minHealthScore.toString());
+    }
+    if (newFilters.minGoodFirstIssues) {
+      params.set('minGoodFirstIssues', newFilters.minGoodFirstIssues.toString());
+    }
+    if (newFilters.hasGoodFirstIssues) {
+      params.set('hasGoodFirstIssues', 'true');
+    }
+    if (newFilters.sortBy) {
+      params.set('sortBy', newFilters.sortBy);
+    }
+    
+    setSearchParams(params);
   };
 
   const handleClearCache = () => {
@@ -236,6 +355,7 @@ const SearchPage = () => {
               onFilterChange={handleFilterChange}
               languages={languages}
               licenses={licenses}
+              topics={topics}
             />
           </aside>
 

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Enhanced Search Functionality Test</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        border: 1px solid #e1e5e9;
+        border-radius: 8px;
+        background: #f8f9fa;
+      }
+      .test-title {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        font-size: 18px;
+      }
+      .test-item {
+        margin-bottom: 10px;
+        padding: 10px;
+        background: white;
+        border-radius: 6px;
+        border-left: 4px solid #3498db;
+      }
+      .query {
+        font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+        background: #f1f3f4;
+        padding: 4px 8px;
+        border-radius: 4px;
+        color: #d63384;
+      }
+      .description {
+        color: #666;
+        font-size: 14px;
+        margin-top: 5px;
+      }
+      .feature-list {
+        list-style: none;
+        padding: 0;
+      }
+      .feature-list li {
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .feature-list li:last-child {
+        border-bottom: none;
+      }
+      .feature-list li::before {
+        content: "✅ ";
+        margin-right: 8px;
+      }
+      .note {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 6px;
+        padding: 15px;
+        margin-top: 20px;
+      }
+      .note-title {
+        font-weight: 600;
+        color: #856404;
+        margin-bottom: 8px;
+      }
+      .note-text {
+        color: #856404;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔍 Enhanced Search Functionality</h1>
+
+      <div class="test-section">
+        <div class="test-title">Enhanced Search Features</div>
+        <ul class="feature-list">
+          <li>
+            Search queries now include repository names, descriptions, and
+            topics
+          </li>
+          <li>
+            Advanced GitHub qualifiers support (topic:, language:, user:, etc.)
+          </li>
+          <li>Topic-based filtering in the sidebar</li>
+          <li>Enhanced search suggestions with topic recommendations</li>
+          <li>URL parameter persistence for topics</li>
+          <li>Improved fuzzy search across metadata</li>
+        </ul>
+      </div>
+
+      <div class="test-section">
+        <div class="test-title">Test Search Queries</div>
+
+        <div class="test-item">
+          <strong>Basic Query Enhancement:</strong>
+          <div class="query">"react"</div>
+          <div class="description">
+            Now searches in name, description, and topics using GitHub's
+            "in:name,description" qualifier
+          </div>
+        </div>
+
+        <div class="test-item">
+          <strong>Topic-based Search:</strong>
+          <div class="query">topic:machine-learning topic:python</div>
+          <div class="description">
+            Searches for repositories tagged with both machine-learning and
+            python topics
+          </div>
+        </div>
+
+        <div class="test-item">
+          <strong>Advanced GitHub Syntax:</strong>
+          <div class="query">
+            language:javascript stars:>1000 topic:web-framework
+          </div>
+          <div class="description">
+            Combines language, stars, and topic filters in a single query
+          </div>
+        </div>
+
+        <div class="test-item">
+          <strong>Mixed Query:</strong>
+          <div class="query">"todo app" topic:react topic:typescript</div>
+          <div class="description">
+            Searches for "todo app" in names/descriptions with react and
+            typescript topics
+          </div>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-title">Filter Sidebar Enhancements</div>
+
+        <div class="test-item">
+          <strong>Topics Filter:</strong>
+          <div class="description">
+            New "Topics" section in the filter sidebar with 70+ popular topics
+            including:
+          </div>
+          <div style="margin-top: 10px; font-size: 14px; color: #666">
+            • machine-learning, web-framework, mobile-app, database, api<br />
+            • frontend, backend, devops, blockchain, ai<br />
+            • react, vue, angular, nodejs, python, javascript<br />
+            • docker, kubernetes, aws, azure, gcp<br />
+            • testing, security, performance, optimization<br />
+            • And many more...
+          </div>
+        </div>
+
+        <div class="test-item">
+          <strong>URL Persistence:</strong>
+          <div class="description">
+            Topic filters are now saved in URL parameters for easy sharing and
+            bookmarking
+          </div>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-title">Search Suggestions Enhancement</div>
+
+        <div class="test-item">
+          <strong>Topic Suggestions:</strong>
+          <div class="description">
+            When typing, users get suggestions for topics with "topic:" prefix
+          </div>
+        </div>
+
+        <div class="test-item">
+          <strong>Enhanced Matching:</strong>
+          <div class="description">
+            Better matching for hyphenated topics (e.g., "machine" matches
+            "machine-learning")
+          </div>
+        </div>
+
+        <div class="test-item">
+          <strong>Query Parsing:</strong>
+          <div class="description">
+            New parseSearchQuery function extracts topics and qualifiers from
+            complex queries
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        <div class="note-title">🚀 How to Test</div>
+        <div class="note-text">
+          1. Start the development server: <code>npm run dev</code><br />
+          2. Go to the search page and try different search queries<br />
+          3. Use the new Topics filter in the sidebar<br />
+          4. Try advanced GitHub search syntax like
+          <code>topic:react language:javascript</code><br />
+          5. Notice how search suggestions now include topic recommendations<br />
+          6. Check that URL parameters persist when filtering by topics
+        </div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-title">Technical Implementation</div>
+
+        <div class="test-item">
+          <strong>Enhanced Query Builder:</strong>
+          <div class="description">
+            buildEnhancedSearchQuery() function creates optimized GitHub API
+            queries
+          </div>
+        </div>
+
+        <div class="test-item">
+          <strong>GitHub API Integration:</strong>
+          <div class="description">
+            Uses GitHub's advanced search qualifiers for better results
+          </div>
+        </div>
+
+        <div class="test-item">
+          <strong>Client-side Filtering:</strong>
+          <div class="description">
+            Combines GitHub API search with client-side filtering for health
+            scores and other metrics
+          </div>
+        </div>
+
+        <div class="test-item">
+          <strong>Caching:</strong>
+          <div class="description">
+            Enhanced caching includes topic parameters for better performance
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
