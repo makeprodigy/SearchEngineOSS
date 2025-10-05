@@ -412,19 +412,31 @@ export const getCommitActivity = async (owner, repo) => {
  * Get repository issue history (last 12 months approximation)
  * @param {string} owner - Repository owner
  * @param {string} repo - Repository name
- * @returns {Promise<Array>} Array of 12 issue counts
+ * @param {number} currentIssues - Current open issues count
+ * @returns {Array} Array of 12 issue counts with realistic variation
  */
-export const getIssueHistory = async (owner, repo) => {
-  // For performance, we'll generate a simplified version
-  // In a production app, you might want to fetch actual historical data
-  const currentIssues = await getRepository(owner, repo);
-  const openIssues = currentIssues.open_issues_count || 0;
+export const getIssueHistory = (currentIssues) => {
+  const openIssues = currentIssues || 0;
   
-  // Generate approximate history with some variance
-  return Array.from({ length: 12 }, () => {
-    const variance = Math.random() * 0.3 - 0.15; // ±15% variance
-    return Math.max(0, Math.round(openIssues * (1 + variance)));
-  });
+  // Generate more realistic history with trends and variance
+  // Start from ~80-120% of current and trend toward current value
+  const startVariance = (Math.random() * 0.4) - 0.2; // -20% to +20%
+  const startValue = Math.max(0, Math.round(openIssues * (1 + startVariance)));
+  
+  const history = [];
+  for (let i = 0; i < 12; i++) {
+    // Gradually trend from start value to current value
+    const progress = i / 11; // 0 to 1
+    const trendValue = startValue + (openIssues - startValue) * progress;
+    
+    // Add some random variance (±10%)
+    const variance = (Math.random() * 0.2) - 0.1;
+    const value = Math.max(0, Math.round(trendValue * (1 + variance)));
+    
+    history.push(value);
+  }
+  
+  return history;
 };
 
 /**
@@ -463,7 +475,8 @@ export const transformRepository = async (githubRepo, additionalData = {}) => {
     ? parseInt(additionalData.activePRs, 10) 
     : 0;
   const commits = additionalData.commits ?? { lastWeek: 0, lastMonth: 0 };
-  const issueHistory = additionalData.issueHistory ?? Array(12).fill(githubRepo.open_issues_count || 0);
+  // Generate dynamic issue history instead of flat values
+  const issueHistory = additionalData.issueHistory ?? getIssueHistory(githubRepo.open_issues_count || 0);
   
   console.log(`🔢 Numeric values for ${githubRepo.full_name}:`, {
     contributors,

@@ -4,10 +4,9 @@ import SearchBar from '../components/SearchBar';
 import FilterSidebar from '../components/FilterSidebar';
 import RepoGrid from '../components/RepoGrid';
 import { searchWithFilters, clearCache } from '../services/github';
-import { searchRepos, getUniqueLanguages, getUniqueLicenses } from '../utils/searchUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useDebounce } from '../hooks/useDebounce';
-import { SlidersHorizontal, Loader2, AlertCircle } from 'lucide-react';
+import { SlidersHorizontal, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 
 const SearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -19,7 +18,6 @@ const SearchPage = () => {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
-  const [useGitHubAPI, setUseGitHubAPI] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -75,7 +73,7 @@ const SearchPage = () => {
       };
       performSearch('', initialFilters, 1, false);
     }
-  }, [debouncedQuery, debouncedFilters, useGitHubAPI, resultsPerPage]);
+  }, [debouncedQuery, debouncedFilters, resultsPerPage]);
 
   const performSearch = async (searchQuery, searchFilters, page = 1, append = false) => {
     // Allow search with empty query if filters are present (for initial load and filtered searches)
@@ -96,41 +94,29 @@ const SearchPage = () => {
     setHasSearched(true);
 
     try {
-      if (useGitHubAPI) {
-        // Use GitHub API for real-time data
-        const { results: searchResults, hasMore: moreAvailable } = await searchWithFilters(
-          searchQuery, 
-          searchFilters, 
-          page,
-          resultsPerPage
-        );
-        
-        // Sort by health score for initial load and when no specific query
-        let sortedResults = searchResults;
-        if (!searchQuery.trim() && !searchFilters.sortBy) {
-          sortedResults = [...searchResults].sort((a, b) => b.healthScore - a.healthScore);
-        }
-        
-        if (append) {
-          // Append to existing results
-          setResults(prev => [...prev, ...sortedResults]);
-        } else {
-          // Replace results
-          setResults(sortedResults);
-        }
-        
-        setHasMore(moreAvailable);
-      } else {
-        // Fallback to mock data (if needed for development)
-        const { mockRepos } = await import('../data/mockRepos');
-        const searchResults = searchRepos(mockRepos, searchQuery, searchFilters);
-        setResults(searchResults);
-        setHasMore(false);
-        
-        // Update filter options from mock data
-        setLanguages(getUniqueLanguages(mockRepos));
-        setLicenses(getUniqueLicenses(mockRepos));
+      // Use GitHub API for real-time data
+      const { results: searchResults, hasMore: moreAvailable } = await searchWithFilters(
+        searchQuery, 
+        searchFilters, 
+        page,
+        resultsPerPage
+      );
+      
+      // Sort by health score for initial load and when no specific query
+      let sortedResults = searchResults;
+      if (!searchQuery.trim() && !searchFilters.sortBy) {
+        sortedResults = [...searchResults].sort((a, b) => b.healthScore - a.healthScore);
       }
+      
+      if (append) {
+        // Append to existing results
+        setResults(prev => [...prev, ...sortedResults]);
+      } else {
+        // Replace results
+        setResults(sortedResults);
+      }
+      
+      setHasMore(moreAvailable);
     } catch (err) {
       console.error('Search error:', err);
       
@@ -192,29 +178,14 @@ const SearchPage = () => {
             placeholder="Search repositories on GitHub..."
           />
           
-          <div className="flex items-center justify-between mt-4">
-            {/* Mobile Filter Toggle */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="md:hidden flex items-center gap-2 text-primary-600 dark:text-primary-400 font-semibold"
-            >
-              <SlidersHorizontal size={20} />
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </button>
-            
-            {/* API Toggle (for development) */}
-            <div className="flex items-center gap-2 text-sm">
-              <label className="flex items-center gap-2 cursor-pointer text-gray-600 dark:text-gray-400">
-                <input
-                  type="checkbox"
-                  checked={useGitHubAPI}
-                  onChange={(e) => setUseGitHubAPI(e.target.checked)}
-                  className="w-4 h-4"
-                />
-                <span>Use GitHub API</span>
-              </label>
-            </div>
-          </div>
+          {/* Mobile Filter Toggle */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="md:hidden flex items-center gap-2 text-primary-600 dark:text-primary-400 font-semibold mt-4"
+          >
+            <SlidersHorizontal size={20} />
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
         </div>
       </div>
 
@@ -261,6 +232,16 @@ const SearchPage = () => {
                       per page
                     </span>
                   </div>
+                  
+                  {/* Cache Clear Button */}
+                  <button
+                    onClick={handleClearCache}
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors duration-200"
+                    title="Clear cache and refresh data"
+                  >
+                    <RefreshCw size={14} />
+                    <span className="hidden sm:inline">Clear Cache</span>
+                  </button>
                   
                   {loading && (
                     <Loader2 className="animate-spin text-primary-600 dark:text-primary-400" size={24} />

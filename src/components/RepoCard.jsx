@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Star, GitFork, Users, AlertCircle, GitPullRequest, Code, BookmarkPlus, Bookmark, ExternalLink, Calendar } from 'lucide-react';
-import { LineChart, Line, ResponsiveContainer } from 'recharts';
+import { Star, GitFork, Users, AlertCircle, GitPullRequest, Code, BookmarkPlus, Bookmark, ExternalLink, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
+import { LineChart, Line, Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getHealthScoreColor, getHealthScoreBgColor, getHealthScoreLabel } from '../utils/healthScore';
 import { useAuth } from '../contexts/AuthContext';
 import { saveRepo, unsaveRepo } from '../services/firebase';
@@ -74,11 +74,29 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
     return num.toString();
   };
 
-  // Prepare data for sparkline
-  const sparklineData = repo.issueHistory.map((value, index) => ({
-    value,
-    index
-  }));
+  // Check if issue history data is available and valid
+  const hasValidIssueHistory = repo.issueHistory && 
+    repo.issueHistory.length === 12 && 
+    repo.issueHistory.some(val => val > 0);
+
+  // Prepare data for sparkline with month labels
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const currentMonth = new Date().getMonth();
+  
+  const sparklineData = hasValidIssueHistory ? repo.issueHistory.map((value, index) => {
+    const monthIndex = (currentMonth - (11 - index) + 12) % 12;
+    return {
+      value,
+      month: monthNames[monthIndex],
+      index
+    };
+  }) : [];
+
+  // Calculate trend (comparing first half vs second half) only if data is valid
+  const firstHalf = hasValidIssueHistory ? repo.issueHistory.slice(0, 6).reduce((a, b) => a + b, 0) / 6 : 0;
+  const secondHalf = hasValidIssueHistory ? repo.issueHistory.slice(6, 12).reduce((a, b) => a + b, 0) / 6 : 0;
+  const trend = secondHalf > firstHalf ? 'up' : secondHalf < firstHalf ? 'down' : 'stable';
+  const trendPercentage = firstHalf > 0 ? (((secondHalf - firstHalf) / firstHalf) * 100).toFixed(1) : 0;
 
   return (
     <div className="card p-6 h-full flex flex-col relative">
@@ -167,27 +185,91 @@ const RepoCard = ({ repo, isSaved = false, onToggleSave }) => {
       )}
 
       {/* Issue History Sparkline */}
-      <div className="mb-4">
+      <div className="mb-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-            Issue Activity (Last 12 months)
-          </span>
-          <span className="text-xs text-gray-500 dark:text-gray-500">
-            {repo.openIssues} open
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              Issue Activity
+            </span>
+            {hasValidIssueHistory && trend !== 'stable' && (
+              <span className={`flex items-center gap-1 text-xs font-medium ${
+                trend === 'up' 
+                  ? 'text-orange-600 dark:text-orange-400' 
+                  : 'text-green-600 dark:text-green-400'
+              }`}>
+                {trend === 'up' ? (
+                  <TrendingUp size={12} />
+                ) : (
+                  <TrendingDown size={12} />
+                )}
+                {Math.abs(trendPercentage)}%
+              </span>
+            )}
+          </div>
+          {hasValidIssueHistory && (
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+              {repo.openIssues} open
+            </span>
+          )}
         </div>
-        <ResponsiveContainer width="100%" height={40}>
-          <LineChart data={sparklineData}>
-            <Line 
-              type="monotone" 
-              dataKey="value" 
-              stroke="#0ea5e9" 
-              strokeWidth={2} 
-              dot={false}
-              activeDot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        
+        {hasValidIssueHistory ? (
+          <>
+            <ResponsiveContainer width="100%" height={60}>
+              <AreaChart data={sparklineData}>
+                <defs>
+                  <linearGradient id={`gradient-${repo.id}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 px-3 py-2 rounded-lg shadow-lg text-xs font-medium">
+                          <div className="font-semibold">{payload[0].payload.month}</div>
+                          <div>{payload[0].value} issues</div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                  cursor={{ stroke: '#0ea5e9', strokeWidth: 1, strokeDasharray: '3 3' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#0ea5e9" 
+                  strokeWidth={2}
+                  fill={`url(#gradient-${repo.id})`}
+                  dot={false}
+                  activeDot={{ r: 4, fill: '#0ea5e9', stroke: '#fff', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+            <div className="flex justify-between mt-1 px-1">
+              <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                {sparklineData[0]?.month}
+              </span>
+              <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                {sparklineData[11]?.month}
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <AlertCircle className="text-gray-400 dark:text-gray-500 mb-2" size={24} />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Issue history data unavailable
+            </p>
+            {repo.openIssues > 0 && (
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">
+                Currently {repo.openIssues} open issue{repo.openIssues !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tech Stack Tags */}
