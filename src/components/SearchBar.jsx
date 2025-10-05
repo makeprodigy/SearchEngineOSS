@@ -157,7 +157,7 @@ const SearchBar = ({ onSearch, placeholder = "Search repositories...", className
                     selectedIndex === index ? 'bg-gray-100 dark:bg-gray-700' : ''
                   }`}
                 >
-                  <span className="text-lg">{suggestion.icon}</span>
+                  <suggestion.icon size={16} className="text-gray-400" />
                   <div className="flex-1 min-w-0">
                     <div 
                       className="text-sm font-medium text-gray-900 dark:text-white truncate"

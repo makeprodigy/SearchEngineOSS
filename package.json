@@ -1,8 +1,8 @@
 {
-  "name": "oss-discovery-engine",
+  "name": "open-search-engine",
   "private": true,
   "version": "1.0.0",
-  "description": "A discoverability engine for finding healthy, beginner-friendly open source projects",
+  "description": "An open search engine for finding healthy, beginner-friendly open source projects",
   "type": "module",
   "scripts": {
     "dev": "vite",

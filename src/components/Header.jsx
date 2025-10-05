@@ -25,7 +25,7 @@ const Header = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 text-2xl font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors">
             <Code2 size={32} />
-            <span className="hidden sm:inline">OSS Discovery</span>
+            <span className="hidden sm:inline">Open Search</span>
           </Link>
 
           {/* Navigation */}

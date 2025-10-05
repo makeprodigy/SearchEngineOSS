@@ -1,4 +1,6 @@
 // Search suggestions service
+import { Folder, Code, Tag, User } from 'lucide-react';
+
 const SUGGESTION_TYPES = {
   REPOSITORY: 'repository',
   LANGUAGE: 'language',
@@ -62,7 +64,7 @@ export const getSearchSuggestions = async (query, limit = 8) => {
     .map(repo => ({
       text: repo,
       type: SUGGESTION_TYPES.REPOSITORY,
-      icon: '📁',
+      icon: Folder,
       description: 'Repository'
     }));
 
@@ -73,7 +75,7 @@ export const getSearchSuggestions = async (query, limit = 8) => {
     .map(lang => ({
       text: `language:${lang}`,
       type: SUGGESTION_TYPES.LANGUAGE,
-      icon: '💻',
+      icon: Code,
       description: 'Programming Language'
     }));
 
@@ -84,7 +86,7 @@ export const getSearchSuggestions = async (query, limit = 8) => {
     .map(topic => ({
       text: topic,
       type: SUGGESTION_TYPES.TOPIC,
-      icon: '🏷️',
+      icon: Tag,
       description: 'Topic'
     }));
 
@@ -95,7 +97,7 @@ export const getSearchSuggestions = async (query, limit = 8) => {
     .map(user => ({
       text: `user:${user}`,
       type: SUGGESTION_TYPES.USER,
-      icon: '👤',
+      icon: User,
       description: 'User/Organization'
     }));
 

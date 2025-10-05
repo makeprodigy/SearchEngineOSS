@@ -1,4 +1,4 @@
-# OSS Discovery Engine
+# Open Search Engine
 
 A modern web application for discovering healthy, beginner-friendly open source projects built with React, Tailwind CSS, Firebase, and the **GitHub API**.
 
